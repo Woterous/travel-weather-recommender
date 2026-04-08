@@ -1,0 +1,90 @@
+{
+  "url": "https://www.tianqi.com/shanghai/",
+  "records": [
+    {
+      "city_slug": "shanghai",
+      "city_name": "上海",
+      "date": "2026-04-08",
+      "weather_detail": "阴",
+      "weather_type": "阴",
+      "max_temp": 17.0,
+      "min_temp": 11.0,
+      "avg_temp": 14.0,
+      "wind_direction": "东南风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "shanghai",
+      "city_name": "上海",
+      "date": "2026-04-09",
+      "weather_detail": "小雨转大雨",
+      "weather_type": "雨",
+      "max_temp": 27.0,
+      "min_temp": 17.0,
+      "avg_temp": 22.0,
+      "wind_direction": "南风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "shanghai",
+      "city_name": "上海",
+      "date": "2026-04-10",
+      "weather_detail": "晴转阴",
+      "weather_type": "阴",
+      "max_temp": 24.0,
+      "min_temp": 17.0,
+      "avg_temp": 20.5,
+      "wind_direction": "西北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "shanghai",
+      "city_name": "上海",
+      "date": "2026-04-11",
+      "weather_detail": "阴转中雨",
+      "weather_type": "雨",
+      "max_temp": 19.0,
+      "min_temp": 15.0,
+      "avg_temp": 17.0,
+      "wind_direction": "东风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "shanghai",
+      "city_name": "上海",
+      "date": "2026-04-12",
+      "weather_detail": "中雨",
+      "weather_type": "雨",
+      "max_temp": 18.0,
+      "min_temp": 14.0,
+      "avg_temp": 16.0,
+      "wind_direction": "东风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "shanghai",
+      "city_name": "上海",
+      "date": "2026-04-13",
+      "weather_detail": "中雨转多云",
+      "weather_type": "雨",
+      "max_temp": 21.0,
+      "min_temp": 15.0,
+      "avg_temp": 18.0,
+      "wind_direction": "东南风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "shanghai",
+      "city_name": "上海",
+      "date": "2026-04-14",
+      "weather_detail": "阴转多云",
+      "weather_type": "阴",
+      "max_temp": 22.0,
+      "min_temp": 14.0,
+      "avg_temp": 18.0,
+      "wind_direction": "东南风",
+      "source_name": "tianqi.com"
+    }
+  ],
+  "raw_length": 79448
+}

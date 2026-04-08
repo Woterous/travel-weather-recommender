@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}旅行天气推荐系统{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <script src="{{ url_for('static', filename='js/echarts.min.js') }}"></script>
+</head>
+<body>
+    <div class="page-shell">
+        <header class="topbar">
+            <a class="brand" href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">
+                <span class="brand-mark">TW</span>
+                <span>
+                    <strong>Travel Weather Recommender</strong>
+                    <small>旅游天气推荐与可视化系统</small>
+                </span>
+            </a>
+            <nav class="nav-links">
+                <a href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">首页</a>
+                <a href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">偏好设置</a>
+                <a href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">城市对比</a>
+                <a href="{{ url_for('history_page') }}?{{ query_with(preferences) }}">历史分析</a>
+            </nav>
+        </header>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <section class="flash-stack">
+                    {% for category, message in messages %}
+                        <div class="flash {{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </section>
+            {% endif %}
+        {% endwith %}
+
+        <main class="main-content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

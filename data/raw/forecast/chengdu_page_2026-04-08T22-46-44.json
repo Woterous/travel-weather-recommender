@@ -1,0 +1,90 @@
+{
+  "url": "https://www.tianqi.com/chengdu/",
+  "records": [
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-08",
+      "weather_detail": "晴",
+      "weather_type": "晴",
+      "max_temp": 24.0,
+      "min_temp": 17.0,
+      "avg_temp": 20.5,
+      "wind_direction": "东北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-09",
+      "weather_detail": "晴转小雨",
+      "weather_type": "雨",
+      "max_temp": 29.0,
+      "min_temp": 18.0,
+      "avg_temp": 23.5,
+      "wind_direction": "东北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-10",
+      "weather_detail": "小雨转阴",
+      "weather_type": "雨",
+      "max_temp": 28.0,
+      "min_temp": 20.0,
+      "avg_temp": 24.0,
+      "wind_direction": "西北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-11",
+      "weather_detail": "阴",
+      "weather_type": "阴",
+      "max_temp": 27.0,
+      "min_temp": 18.0,
+      "avg_temp": 22.5,
+      "wind_direction": "西北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-12",
+      "weather_detail": "阴转小雨",
+      "weather_type": "雨",
+      "max_temp": 24.0,
+      "min_temp": 19.0,
+      "avg_temp": 21.5,
+      "wind_direction": "东北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-13",
+      "weather_detail": "小雨",
+      "weather_type": "雨",
+      "max_temp": 24.0,
+      "min_temp": 18.0,
+      "avg_temp": 21.0,
+      "wind_direction": "东北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-14",
+      "weather_detail": "多云转阴",
+      "weather_type": "阴",
+      "max_temp": 25.0,
+      "min_temp": 17.0,
+      "avg_temp": 21.0,
+      "wind_direction": "北风",
+      "source_name": "tianqi.com"
+    }
+  ],
+  "raw_length": 85261
+}

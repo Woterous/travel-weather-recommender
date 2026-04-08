@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+
+{% block title %}历史分析 | 旅行天气推荐系统{% endblock %}
+
+{% block content %}
+<section class="hero-panel compact">
+    <div class="hero-copy">
+        <p class="eyebrow">历史分析页</p>
+        <h1>{{ city.name }} 的月度历史画像</h1>
+        <p>首版以月度统计为主，不依赖全量日级明细。</p>
+    </div>
+    <form method="get" action="{{ url_for('history_page') }}" class="card filter-form">
+        <label>城市</label>
+        <select name="city">
+            {% for item in cities %}
+                <option value="{{ item.slug }}" {% if item.slug == city.slug %}selected{% endif %}>{{ item.name }}</option>
+            {% endfor %}
+        </select>
+        <label>月份</label>
+        <select name="month">
+            {% for month in month_options %}
+                <option value="{{ month }}" {% if month == selected_month %}selected{% endif %}>{{ month }} 月</option>
+            {% endfor %}
+        </select>
+        <label>指标</label>
+        <select name="metric">
+            <option value="suitability" {% if metric == 'suitability' %}selected{% endif %}>历史适宜度</option>
+            <option value="rainy_ratio" {% if metric == 'rainy_ratio' %}selected{% endif %}>雨天频率</option>
+            <option value="comfortable_ratio" {% if metric == 'comfortable_ratio' %}selected{% endif %}>舒适温度占比</option>
+            <option value="temp_stability" {% if metric == 'temp_stability' %}selected{% endif %}>温度波动</option>
+        </select>
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <button type="submit" class="button">查看历史分析</button>
+    </form>
+</section>
+
+<section class="content-grid">
+    <div class="card chart-card">
+        <div class="section-head"><h2>城市历史趋势</h2><span>本地月度统计</span></div>
+        <div id="history-main-chart" class="chart"></div>
+    </div>
+    <div class="card">
+        <div class="section-head"><h2>口径说明</h2><span>当前月份 {{ selected_month }} 月</span></div>
+        <ul class="note-list">
+            <li>历史适宜度由舒适天占比、雨天频率和温度稳定性共同组成。</li>
+            <li>雨天频率越低越适合出游。</li>
+            <li>舒适温度占比越高，长期体验越稳定。</li>
+            <li>AQI 当前 {{ "已参与" if aqi_available else "未参与" }} 历史分析。</li>
+        </ul>
+    </div>
+</section>
+
+<section class="card">
+    <div class="section-head"><h2>{{ selected_month }} 月城市排名</h2><span>最近刷新 {{ latest_refresh.refresh_time }}</span></div>
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>排名</th>
+                <th>城市</th>
+                <th>历史适宜度</th>
+                <th>雨天频率</th>
+                <th>舒适温度占比</th>
+                <th>温度波动</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in ranking %}
+            <tr>
+                <td>{{ row.rank }}</td>
+                <td>{{ row.city_name }}</td>
+                <td>{{ row.history_score }}</td>
+                <td>{{ "%.0f"|format(row.rainy_ratio * 100) }}%</td>
+                <td>{{ "%.0f"|format(row.comfortable_days_ratio * 100) }}%</td>
+                <td>{{ "%.1f"|format(row.temp_std) }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.renderLineChart("history-main-chart", {
+    labels: {{ chart_data.months | tojson }},
+    series: [
+        { name: "历史适宜度", values: {{ chart_data.history_scores | tojson }} },
+        { name: "雨天频率(%)", values: {{ chart_data.rainy_ratio | tojson }} },
+        { name: "舒适温度占比(%)", values: {{ chart_data.comfortable_ratio | tojson }} }
+    ],
+    title: "历史月度指标"
+});
+</script>
+{% endblock %}

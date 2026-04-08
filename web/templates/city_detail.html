@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+
+{% block title %}{{ city.name }} 详情 | 旅行天气推荐系统{% endblock %}
+
+{% block content %}
+<section class="hero-panel compact">
+    <div class="hero-copy">
+        <p class="eyebrow">城市详情页</p>
+        <h1>{{ city.name }}</h1>
+        <p>展示指定日期的评分结果，以及未来趋势和历史月度统计。</p>
+    </div>
+    <form method="get" action="{{ url_for('city_detail', city_slug=city.slug) }}" class="card filter-form">
+        <h3>切换日期</h3>
+        <select name="date">
+            {% for date_item in available_dates %}
+                <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
+            {% endfor %}
+        </select>
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <button type="submit" class="button">查看</button>
+    </form>
+</section>
+
+{% if selected %}
+<section class="content-grid">
+    <div class="card">
+        <div class="section-head"><h2>基础天气信息</h2><span>{{ selected.date }}</span></div>
+        <ul class="meta-list">
+            <li><span>天气</span><strong>{{ selected.weather_detail }}</strong></li>
+            <li><span>最高温</span><strong>{{ selected.max_temp }}℃</strong></li>
+            <li><span>最低温</span><strong>{{ selected.min_temp }}℃</strong></li>
+            <li><span>平均温</span><strong>{{ selected.avg_temp }}℃</strong></li>
+            <li><span>风力等级</span><strong>{{ selected.wind_level if selected.wind_level is not none else "-" }}</strong></li>
+            <li><span>降雨</span><strong>{{ "有" if selected.rain_flag else "低风险" }}</strong></li>
+        </ul>
+    </div>
+    <div class="card">
+        <div class="section-head"><h2>推荐结论</h2><span>总分 {{ selected.score_total }}</span></div>
+        <p>{{ selected.reason }}</p>
+        <ul class="tag-list">
+            <li>{{ "无 AQI 模式" if not aqi_available else "AQI 已启用" }}</li>
+            <li>最近刷新 {{ latest_refresh.refresh_time }}</li>
+        </ul>
+    </div>
+</section>
+
+<section class="content-grid">
+    <div class="card chart-card">
+        <div class="section-head"><h2>分项得分</h2><span>单日</span></div>
+        <div id="breakdown-chart" class="chart"></div>
+    </div>
+    <div class="card chart-card">
+        <div class="section-head"><h2>未来趋势</h2><span>近 7 天</span></div>
+        <div id="trend-chart" class="chart"></div>
+    </div>
+</section>
+
+<section class="content-grid">
+    <div class="card">
+        <div class="section-head"><h2>历史月度统计</h2><span>本地持久化</span></div>
+        <ul class="meta-list">
+            {% for item in history_series[-6:] %}
+            <li><span>{{ item.month_key }}</span><strong>舒适天占比 {{ "%.0f"|format(item.comfortable_days_ratio * 100) }}%</strong></li>
+            {% endfor %}
+        </ul>
+    </div>
+    <div class="card chart-card">
+        <div class="section-head"><h2>历史趋势</h2><span>月度适宜度</span></div>
+        <div id="history-chart" class="chart"></div>
+    </div>
+</section>
+{% else %}
+<section class="empty-state card">
+    <h2>当前日期没有可展示的城市详情</h2>
+    <p>先刷新数据，或者切换到存在数据的日期。</p>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if selected %}
+<script>
+window.renderBarChart("breakdown-chart", {
+    labels: {{ breakdown_chart["labels"] | tojson }},
+    values: {{ breakdown_chart["values"] | tojson }},
+    title: "分项得分"
+});
+window.renderLineChart("trend-chart", {
+    labels: {{ trend_chart["dates"] | tojson }},
+    series: [
+        { name: "推荐总分", values: {{ trend_chart["scores"] | tojson }} },
+        { name: "平均温度", values: {{ trend_chart["temps"] | tojson }} }
+    ],
+    title: "未来趋势"
+});
+window.renderLineChart("history-chart", {
+    labels: {{ history_chart["months"] | tojson }},
+    series: [{ name: "历史适宜度", values: {{ history_chart["history_scores"] | tojson }} }],
+    title: "历史月度适宜度"
+});
+</script>
+{% endif %}
+{% endblock %}

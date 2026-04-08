@@ -1,0 +1,90 @@
+{
+  "url": "https://www.tianqi.com/chongqing/",
+  "records": [
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-08",
+      "weather_detail": "多云",
+      "weather_type": "多云",
+      "max_temp": 28.0,
+      "min_temp": 19.0,
+      "avg_temp": 23.5,
+      "wind_direction": "西北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-09",
+      "weather_detail": "晴转多云",
+      "weather_type": "多云",
+      "max_temp": 28.0,
+      "min_temp": 21.0,
+      "avg_temp": 24.5,
+      "wind_direction": "西风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-10",
+      "weather_detail": "多云转小雨",
+      "weather_type": "雨",
+      "max_temp": 25.0,
+      "min_temp": 21.0,
+      "avg_temp": 23.0,
+      "wind_direction": "北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-11",
+      "weather_detail": "中雨转晴",
+      "weather_type": "雨",
+      "max_temp": 22.0,
+      "min_temp": 19.0,
+      "avg_temp": 20.5,
+      "wind_direction": "东风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-12",
+      "weather_detail": "阴转多云",
+      "weather_type": "阴",
+      "max_temp": 26.0,
+      "min_temp": 18.0,
+      "avg_temp": 22.0,
+      "wind_direction": "北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-13",
+      "weather_detail": "小雨转多云",
+      "weather_type": "雨",
+      "max_temp": 26.0,
+      "min_temp": 20.0,
+      "avg_temp": 23.0,
+      "wind_direction": "东北风",
+      "source_name": "tianqi.com"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-14",
+      "weather_detail": "多云转小雨",
+      "weather_type": "雨",
+      "max_temp": 22.0,
+      "min_temp": 19.0,
+      "avg_temp": 20.5,
+      "wind_direction": "西北风",
+      "source_name": "tianqi.com"
+    }
+  ],
+  "raw_length": 84454
+}

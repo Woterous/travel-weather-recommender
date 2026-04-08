@@ -1,0 +1,111 @@
+{
+  "url": "https://api.open-meteo.com/v1/forecast?latitude=34.3416&longitude=108.9398&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&forecast_days=7&timezone=Asia%2FShanghai",
+  "records": [
+    {
+      "city_slug": "xian",
+      "city_name": "西安",
+      "date": "2026-04-08",
+      "weather_detail_api": "阵雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 17.8,
+      "min_temp_api": 12.4,
+      "avg_temp_api": 15.1,
+      "wind_speed_kmh": 26.1,
+      "wind_level": 4,
+      "precipitation_mm": 2.3,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "xian",
+      "city_name": "西安",
+      "date": "2026-04-09",
+      "weather_detail_api": "雾",
+      "weather_type_api": "雾霾",
+      "max_temp_api": 25.0,
+      "min_temp_api": 11.2,
+      "avg_temp_api": 18.1,
+      "wind_speed_kmh": 11.2,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "xian",
+      "city_name": "西安",
+      "date": "2026-04-10",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 22.2,
+      "min_temp_api": 13.9,
+      "avg_temp_api": 18.1,
+      "wind_speed_kmh": 9.1,
+      "wind_level": 2,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "xian",
+      "city_name": "西安",
+      "date": "2026-04-11",
+      "weather_detail_api": "小雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 21.5,
+      "min_temp_api": 13.1,
+      "avg_temp_api": 17.3,
+      "wind_speed_kmh": 11.5,
+      "wind_level": 3,
+      "precipitation_mm": 0.7,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "xian",
+      "city_name": "西安",
+      "date": "2026-04-12",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 21.5,
+      "min_temp_api": 13.6,
+      "avg_temp_api": 17.6,
+      "wind_speed_kmh": 5.7,
+      "wind_level": 2,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "xian",
+      "city_name": "西安",
+      "date": "2026-04-13",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 22.1,
+      "min_temp_api": 14.4,
+      "avg_temp_api": 18.2,
+      "wind_speed_kmh": 9.6,
+      "wind_level": 2,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "xian",
+      "city_name": "西安",
+      "date": "2026-04-14",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 21.2,
+      "min_temp_api": 12.8,
+      "avg_temp_api": 17.0,
+      "wind_speed_kmh": 10.6,
+      "wind_level": 2,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    }
+  ],
+  "daily_units": {
+    "time": "iso8601",
+    "temperature_2m_max": "°C",
+    "temperature_2m_min": "°C",
+    "precipitation_sum": "mm",
+    "wind_speed_10m_max": "km/h",
+    "weather_code": "wmo code"
+  }
+}

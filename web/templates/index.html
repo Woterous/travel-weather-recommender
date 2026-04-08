@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+
+{% block title %}首页兼排行榜 | 旅行天气推荐系统{% endblock %}
+
+{% block content %}
+<section class="hero-panel">
+    <div class="hero-copy">
+        <p class="eyebrow">首页兼排行榜页</p>
+        <h1>固定 10 城市的旅游出行推荐</h1>
+        <p>
+            页面默认读取本地 SQLite 数据，不会在每次访问时实时抓取。
+            需要更新数据时，使用右侧的手动刷新按钮。
+        </p>
+    </div>
+    <div class="hero-meta card">
+        <h3>当前状态</h3>
+        <ul class="meta-list">
+            <li><span>数据状态</span><strong>{{ latest_refresh.status }}</strong></li>
+            <li><span>最近更新时间</span><strong>{{ latest_refresh.refresh_time }}</strong></li>
+            <li><span>AQI 模式</span><strong>{{ "已启用" if aqi_available else "无 AQI 模式" }}</strong></li>
+            <li><span>当前日期</span><strong>{{ selected_date or "暂无数据" }}</strong></li>
+        </ul>
+        <form method="post" action="{{ url_for('refresh') }}" class="refresh-form">
+            <input type="hidden" name="date" value="{{ selected_date }}">
+            {% for key, value in preferences.items() %}
+                <input type="hidden" name="{{ key }}" value="{{ value }}">
+            {% endfor %}
+            <button type="submit" class="button button-primary">手动刷新数据</button>
+        </form>
+        <p class="muted">{{ latest_refresh.message }}</p>
+    </div>
+</section>
+
+<section class="controls-grid">
+    <form method="get" action="{{ url_for('home') }}" class="card filter-form">
+        <h3>筛选条件</h3>
+        <label>日期</label>
+        <select name="date">
+            {% for date_item in available_dates %}
+                <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
+            {% endfor %}
+        </select>
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <button type="submit" class="button">更新排行榜</button>
+    </form>
+
+    <div class="card">
+        <h3>当前偏好</h3>
+        <ul class="tag-list">
+            <li>{{ preference_label("rain_sensitivity", preferences["rain_sensitivity"]) }}</li>
+            <li>{{ preference_label("temperature_preference", preferences["temperature_preference"]) }}</li>
+            <li>{{ preference_label("wind_sensitivity", preferences["wind_sensitivity"]) }}</li>
+            <li>{{ preference_label("travel_style", preferences["travel_style"]) }}</li>
+        </ul>
+        <a class="button button-ghost" href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date) }}">调整偏好</a>
+    </div>
+
+    <div class="card">
+        <h3>权重预览</h3>
+        <ul class="weight-list">
+            {% for key, value in weights_preview.items() %}
+                <li>
+                    <span>
+                        {% if key == "temperature" %}温度舒适度{% endif %}
+                        {% if key == "rain" %}降雨风险{% endif %}
+                        {% if key == "wind" %}风力舒适度{% endif %}
+                        {% if key == "weather" %}天气类型{% endif %}
+                        {% if key == "history" %}历史稳定性{% endif %}
+                        {% if key == "aqi" %}AQI{% endif %}
+                    </span>
+                    <strong>{{ "%.2f"|format(value) }}</strong>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
+</section>
+
+{% if ranking %}
+<section class="content-grid">
+    <div class="card chart-card">
+        <div class="section-head">
+            <h2>总分排行榜</h2>
+            <span>{{ selected_date }}</span>
+        </div>
+        <div id="ranking-chart" class="chart"></div>
+    </div>
+    <div class="card ranking-card">
+        <div class="section-head">
+            <h2>Top 10 城市</h2>
+            <span>展示本地缓存结果</span>
+        </div>
+        <ol class="ranking-list">
+            {% for row in ranking %}
+            <li class="ranking-row">
+                <div>
+                    <strong>#{{ row.rank }} {{ row.city_name }}</strong>
+                    <p>{{ row.reason_summary }}</p>
+                </div>
+                <div class="ranking-actions">
+                    <span class="score-pill">{{ row.score_total }}</span>
+                    <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.city_slug) }}?{{ query_with(preferences, date=selected_date) }}">详情</a>
+                </div>
+            </li>
+            {% endfor %}
+        </ol>
+    </div>
+</section>
+
+<section class="city-grid">
+    {% for row in ranking %}
+    <article class="city-card">
+        <div class="city-card-head">
+            <h3>{{ row.city_name }}</h3>
+            <span>#{{ row.rank }}</span>
+        </div>
+        <p class="weather-line">{{ row.weather_detail }} · 均温 {{ "%.1f"|format(row.avg_temp) }}℃</p>
+        <p class="muted">风力 {{ row.wind_level if row.wind_level is not none else "-" }} 级 · {{ "有雨" if row.rain_flag else "少雨" }}</p>
+        <div class="city-card-foot">
+            <strong class="score-big">{{ row.score_total }}</strong>
+            <div class="card-actions">
+                <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.city_slug) }}?{{ query_with(preferences, date=selected_date) }}">查看详情</a>
+                <a class="button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b='beijing' if row.city_slug != 'beijing' else 'shanghai') }}">加入对比</a>
+            </div>
+        </div>
+    </article>
+    {% endfor %}
+</section>
+{% else %}
+<section class="empty-state card">
+    <h2>当前还没有可展示的数据</h2>
+    <p>先点击“手动刷新数据”，抓取未来天气和历史月度统计后再进入演示。</p>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+window.renderBarChart("ranking-chart", {
+    labels: {{ chart_data.cities | tojson }},
+    values: {{ chart_data.scores | tojson }},
+    title: "城市推荐总分"
+});
+</script>
+{% endblock %}

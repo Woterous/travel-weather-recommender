@@ -1,0 +1,111 @@
+{
+  "url": "https://api.open-meteo.com/v1/forecast?latitude=30.5728&longitude=104.0668&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&forecast_days=7&timezone=Asia%2FShanghai",
+  "records": [
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-08",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 23.0,
+      "min_temp_api": 15.7,
+      "avg_temp_api": 19.4,
+      "wind_speed_kmh": 12.9,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-09",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 29.0,
+      "min_temp_api": 17.0,
+      "avg_temp_api": 23.0,
+      "wind_speed_kmh": 8.4,
+      "wind_level": 2,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-10",
+      "weather_detail_api": "雷阵雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 25.5,
+      "min_temp_api": 19.0,
+      "avg_temp_api": 22.2,
+      "wind_speed_kmh": 11.5,
+      "wind_level": 3,
+      "precipitation_mm": 6.3,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-11",
+      "weather_detail_api": "小雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 23.7,
+      "min_temp_api": 17.1,
+      "avg_temp_api": 20.4,
+      "wind_speed_kmh": 10.7,
+      "wind_level": 2,
+      "precipitation_mm": 0.1,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-12",
+      "weather_detail_api": "小雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 23.6,
+      "min_temp_api": 16.3,
+      "avg_temp_api": 20.0,
+      "wind_speed_kmh": 8.4,
+      "wind_level": 2,
+      "precipitation_mm": 0.9,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-13",
+      "weather_detail_api": "小雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 26.0,
+      "min_temp_api": 16.3,
+      "avg_temp_api": 21.1,
+      "wind_speed_kmh": 10.8,
+      "wind_level": 2,
+      "precipitation_mm": 6.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chengdu",
+      "city_name": "成都",
+      "date": "2026-04-14",
+      "weather_detail_api": "小雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 25.3,
+      "min_temp_api": 16.2,
+      "avg_temp_api": 20.8,
+      "wind_speed_kmh": 10.4,
+      "wind_level": 2,
+      "precipitation_mm": 6.9,
+      "source_name_api": "open-meteo forecast"
+    }
+  ],
+  "daily_units": {
+    "time": "iso8601",
+    "temperature_2m_max": "°C",
+    "temperature_2m_min": "°C",
+    "precipitation_sum": "mm",
+    "wind_speed_10m_max": "km/h",
+    "weather_code": "wmo code"
+  }
+}

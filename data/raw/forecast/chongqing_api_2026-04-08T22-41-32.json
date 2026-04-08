@@ -1,0 +1,111 @@
+{
+  "url": "https://api.open-meteo.com/v1/forecast?latitude=29.563&longitude=106.5516&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&forecast_days=7&timezone=Asia%2FShanghai",
+  "records": [
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-08",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 26.1,
+      "min_temp_api": 17.7,
+      "avg_temp_api": 21.9,
+      "wind_speed_kmh": 15.0,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-09",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 26.4,
+      "min_temp_api": 17.5,
+      "avg_temp_api": 21.9,
+      "wind_speed_kmh": 11.2,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-10",
+      "weather_detail_api": "雷阵雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 25.4,
+      "min_temp_api": 17.9,
+      "avg_temp_api": 21.6,
+      "wind_speed_kmh": 13.6,
+      "wind_level": 3,
+      "precipitation_mm": 4.3,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-11",
+      "weather_detail_api": "阵雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 22.8,
+      "min_temp_api": 19.1,
+      "avg_temp_api": 21.0,
+      "wind_speed_kmh": 11.5,
+      "wind_level": 3,
+      "precipitation_mm": 3.2,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-12",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 20.6,
+      "min_temp_api": 18.4,
+      "avg_temp_api": 19.5,
+      "wind_speed_kmh": 7.3,
+      "wind_level": 2,
+      "precipitation_mm": 0.9,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-13",
+      "weather_detail_api": "阵雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 20.1,
+      "min_temp_api": 17.5,
+      "avg_temp_api": 18.8,
+      "wind_speed_kmh": 5.3,
+      "wind_level": 2,
+      "precipitation_mm": 13.8,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "chongqing",
+      "city_name": "重庆",
+      "date": "2026-04-14",
+      "weather_detail_api": "阵雨",
+      "weather_type_api": "雨",
+      "max_temp_api": 23.9,
+      "min_temp_api": 17.1,
+      "avg_temp_api": 20.5,
+      "wind_speed_kmh": 5.6,
+      "wind_level": 2,
+      "precipitation_mm": 3.0,
+      "source_name_api": "open-meteo forecast"
+    }
+  ],
+  "daily_units": {
+    "time": "iso8601",
+    "temperature_2m_max": "°C",
+    "temperature_2m_min": "°C",
+    "precipitation_sum": "mm",
+    "wind_speed_10m_max": "km/h",
+    "weather_code": "wmo code"
+  }
+}

@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}城市对比 | 旅行天气推荐系统{% endblock %}
+
+{% block content %}
+<section class="hero-panel compact">
+    <div class="hero-copy">
+        <p class="eyebrow">城市对比页</p>
+        <h1>双城市对比</h1>
+        <p>对比总分、天气维度和历史月度表现。</p>
+    </div>
+    <form method="get" action="{{ url_for('compare_page') }}" class="card filter-form">
+        <label>日期</label>
+        <select name="date">
+            {% for date_item in available_dates %}
+                <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
+            {% endfor %}
+        </select>
+        <label>城市 A</label>
+        <select name="city_a">
+            {% for city in cities %}
+                <option value="{{ city.slug }}" {% if city.slug == city_a %}selected{% endif %}>{{ city.name }}</option>
+            {% endfor %}
+        </select>
+        <label>城市 B</label>
+        <select name="city_b">
+            {% for city in cities %}
+                <option value="{{ city.slug }}" {% if city.slug == city_b %}selected{% endif %}>{{ city.name }}</option>
+            {% endfor %}
+        </select>
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <button type="submit" class="button">开始对比</button>
+    </form>
+</section>
+
+{% if row_a and row_b %}
+<section class="compare-overview">
+    <div class="card score-compare">
+        <h3>{{ row_a.city_name }}</h3>
+        <strong class="score-big">{{ row_a.score_total }}</strong>
+        <p>{{ row_a.weather_detail }} · {{ row_a.avg_temp }}℃</p>
+    </div>
+    <div class="card score-compare center">
+        <h3>分差</h3>
+        <strong class="score-big">{{ "%.1f"|format(row_a.score_total - row_b.score_total) }}</strong>
+        <p>{{ row_a.city_name if row_a.score_total >= row_b.score_total else row_b.city_name }} 当前更占优</p>
+    </div>
+    <div class="card score-compare">
+        <h3>{{ row_b.city_name }}</h3>
+        <strong class="score-big">{{ row_b.score_total }}</strong>
+        <p>{{ row_b.weather_detail }} · {{ row_b.avg_temp }}℃</p>
+    </div>
+</section>
+
+<section class="content-grid">
+    <div class="card chart-card">
+        <div class="section-head"><h2>分项对比</h2><span>{{ selected_date }}</span></div>
+        <div id="compare-chart" class="chart"></div>
+    </div>
+    <div class="card">
+        <div class="section-head"><h2>关键结论</h2><span>最近刷新 {{ latest_refresh.refresh_time }}</span></div>
+        <p>{{ row_a.reason }}</p>
+        <p>{{ row_b.reason }}</p>
+    </div>
+</section>
+
+<section class="card chart-card">
+    <div class="section-head"><h2>历史月度适宜度对比</h2><span>本地历史数据</span></div>
+    <div id="history-compare-chart" class="chart"></div>
+</section>
+{% else %}
+<section class="empty-state card">
+    <h2>当前没有足够的数据用于城市对比</h2>
+    <p>先刷新数据，或者切换到有数据的日期。</p>
+</section>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if row_a and row_b %}
+<script>
+window.renderGroupedBarChart("compare-chart", {
+    labels: {{ compare_chart.labels | tojson }},
+    series: [
+        { name: "{{ row_a.city_name }}", values: {{ compare_chart.city_a | tojson }} },
+        { name: "{{ row_b.city_name }}", values: {{ compare_chart.city_b | tojson }} }
+    ],
+    title: "分项评分对比"
+});
+window.renderLineChart("history-compare-chart", {
+    labels: {{ history_chart.months | tojson }},
+    series: [
+        { name: "{{ row_a.city_name }}", values: {{ history_chart.city_a | tojson }} },
+        { name: "{{ row_b.city_name }}", values: {{ history_chart.city_b | tojson }} }
+    ],
+    title: "历史月度适宜度"
+});
+</script>
+{% endif %}
+{% endblock %}

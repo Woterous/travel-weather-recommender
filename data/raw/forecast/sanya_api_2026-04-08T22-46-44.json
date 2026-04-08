@@ -1,0 +1,111 @@
+{
+  "url": "https://api.open-meteo.com/v1/forecast?latitude=18.2528&longitude=109.512&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,weather_code&forecast_days=7&timezone=Asia%2FShanghai",
+  "records": [
+    {
+      "city_slug": "sanya",
+      "city_name": "三亚",
+      "date": "2026-04-08",
+      "weather_detail_api": "多云",
+      "weather_type_api": "多云",
+      "max_temp_api": 31.4,
+      "min_temp_api": 26.9,
+      "avg_temp_api": 29.1,
+      "wind_speed_kmh": 16.8,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "sanya",
+      "city_name": "三亚",
+      "date": "2026-04-09",
+      "weather_detail_api": "多云",
+      "weather_type_api": "多云",
+      "max_temp_api": 29.8,
+      "min_temp_api": 26.7,
+      "avg_temp_api": 28.2,
+      "wind_speed_kmh": 16.5,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "sanya",
+      "city_name": "三亚",
+      "date": "2026-04-10",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 30.2,
+      "min_temp_api": 26.4,
+      "avg_temp_api": 28.3,
+      "wind_speed_kmh": 13.3,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "sanya",
+      "city_name": "三亚",
+      "date": "2026-04-11",
+      "weather_detail_api": "多云",
+      "weather_type_api": "多云",
+      "max_temp_api": 30.2,
+      "min_temp_api": 26.5,
+      "avg_temp_api": 28.4,
+      "wind_speed_kmh": 16.0,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "sanya",
+      "city_name": "三亚",
+      "date": "2026-04-12",
+      "weather_detail_api": "多云",
+      "weather_type_api": "多云",
+      "max_temp_api": 30.2,
+      "min_temp_api": 27.1,
+      "avg_temp_api": 28.6,
+      "wind_speed_kmh": 18.2,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "sanya",
+      "city_name": "三亚",
+      "date": "2026-04-13",
+      "weather_detail_api": "多云",
+      "weather_type_api": "多云",
+      "max_temp_api": 30.4,
+      "min_temp_api": 27.2,
+      "avg_temp_api": 28.8,
+      "wind_speed_kmh": 18.2,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    },
+    {
+      "city_slug": "sanya",
+      "city_name": "三亚",
+      "date": "2026-04-14",
+      "weather_detail_api": "阴",
+      "weather_type_api": "阴",
+      "max_temp_api": 30.4,
+      "min_temp_api": 26.9,
+      "avg_temp_api": 28.6,
+      "wind_speed_kmh": 16.8,
+      "wind_level": 3,
+      "precipitation_mm": 0.0,
+      "source_name_api": "open-meteo forecast"
+    }
+  ],
+  "daily_units": {
+    "time": "iso8601",
+    "temperature_2m_max": "°C",
+    "temperature_2m_min": "°C",
+    "precipitation_sum": "mm",
+    "wind_speed_10m_max": "km/h",
+    "weather_code": "wmo code"
+  }
+}
