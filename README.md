@@ -14,8 +14,9 @@
 ## 功能范围
 
 - 固定 10 城市未来天气推荐
+- 免费 Open-Meteo Air Quality API 接入 AQI 空气质量
 - 历史月度统计分析
-- 规则型旅游适宜度评分
+- 参考旅游气候指数论文的规则型旅游适宜度评分
 - 偏好设置
 - 首页兼排行榜
 - 城市详情
@@ -46,6 +47,7 @@ python scripts/crawl_all.py
 
 - 抓取未来天气网页数据
 - 使用公开 API 补充未来天气风力与降水字段
+- 使用免费 Open-Meteo Air Quality API 补充 AQI 空气质量字段
 - 获取历史归档数据并聚合为月度统计
 - 保存原始 JSON
 - 生成处理后的 CSV
@@ -74,3 +76,7 @@ data/       原始数据、处理数据、SQLite
 scripts/    手动执行脚本
 docs/       需求、执行规范、验收清单、页面草图
 ```
+
+## 评分依据
+
+评分权重说明见 `docs/aqi-and-weight-basis.md`。

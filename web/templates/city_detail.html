@@ -34,6 +34,9 @@
             <li><span>平均温</span><strong>{{ selected.avg_temp }}℃</strong></li>
             <li><span>风力等级</span><strong>{{ selected.wind_level if selected.wind_level is not none else "-" }}</strong></li>
             <li><span>降雨</span><strong>{{ "有" if selected.rain_flag else "低风险" }}</strong></li>
+            {% if aqi_available %}
+            <li><span>AQI</span><strong>{{ aqi_display(selected.aqi) }}</strong></li>
+            {% endif %}
         </ul>
     </div>
     <div class="card">

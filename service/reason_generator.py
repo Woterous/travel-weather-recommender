@@ -32,6 +32,15 @@ def generate_reason(row: dict, breakdown: dict, preferences: dict, history_basel
 
     avg_temp = row.get("avg_temp")
     rain_text = "有降水" if row.get("rain_flag") else "降水风险低"
+    aqi_value = row.get("aqi")
+    aqi_text = ""
+    if aqi_value is not None:
+        try:
+            aqi_number = float(aqi_value)
+            if aqi_number == aqi_number:
+                aqi_text = f"AQI 约 {aqi_number:.0f}。"
+        except (TypeError, ValueError):
+            aqi_text = ""
     history_text = ""
     if history_baseline:
         comfort = float(history_baseline.get("comfortable_days_ratio", 0.0)) * 100
@@ -41,6 +50,7 @@ def generate_reason(row: dict, breakdown: dict, preferences: dict, history_basel
         f"{row['city_name']} {row['date']} 预计 {row.get('weather_detail', row.get('weather_type', '未知天气'))}，"
         f"均温 {avg_temp:.1f}℃，{rain_text}。"
         f"{build_preference_hint(preferences)}"
+        f"{aqi_text}"
         f"主要加分项是{positive_labels.get(top_dimension, top_dimension)}，"
         f"主要扣分项是{negative_labels.get(low_dimension, low_dimension)}。"
         f"{history_text}"

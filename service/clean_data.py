@@ -11,14 +11,22 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
 
-def build_forecast_dataset(page_payloads: dict, api_payloads: dict, crawl_time: str) -> pd.DataFrame:
+def build_forecast_dataset(
+    page_payloads: dict,
+    api_payloads: dict,
+    crawl_time: str,
+    air_quality_payloads: dict | None = None,
+) -> pd.DataFrame:
+    air_quality_payloads = air_quality_payloads or {}
     rows = []
-    for city_slug in sorted(set(page_payloads) | set(api_payloads)):    ##合并数据，优先用页面数据，缺失时用 API 补充
+    for city_slug in sorted(set(page_payloads) | set(api_payloads) | set(air_quality_payloads)):    ##合并数据，优先用页面数据，缺失时用 API 补充
         page_payload = page_payloads.get(city_slug, {})
         api_map = {record["date"]: record for record in api_payloads.get(city_slug, {}).get("records", [])}
+        aqi_map = {record["date"]: record for record in air_quality_payloads.get(city_slug, {}).get("records", [])}
         page_dates = set()
         for record in page_payload.get("records", []):
             api_record = api_map.get(record["date"], {})
+            aqi_record = aqi_map.get(record["date"], {})
             max_temp = record.get("max_temp") if record.get("max_temp") is not None else api_record.get("max_temp_api")
             min_temp = record.get("min_temp") if record.get("min_temp") is not None else api_record.get("min_temp_api")
             avg_temp = record.get("avg_temp")
@@ -40,7 +48,7 @@ def build_forecast_dataset(page_payloads: dict, api_payloads: dict, crawl_time: 
                     "wind_level": api_record.get("wind_level"),
                     "precipitation_mm": precipitation_mm,
                     "rain_flag": infer_rain_flag(record.get("weather_detail"), precipitation_mm),   ##判断是否下雨
-                    "aqi": None,
+                    "aqi": aqi_record.get("aqi"),
                     "source_type": "forecast",
                     "source_name": "tianqi.com + open-meteo forecast",
                     "crawl_time": crawl_time,
@@ -51,6 +59,7 @@ def build_forecast_dataset(page_payloads: dict, api_payloads: dict, crawl_time: 
         for api_record in api_payloads.get(city_slug, {}).get("records", []):   ##统一字段类型、去重、排序
             if api_record["date"] in page_dates:
                 continue
+            aqi_record = aqi_map.get(api_record["date"], {})
             precipitation_mm = api_record.get("precipitation_mm", 0.0)
             rows.append(
                 {
@@ -67,7 +76,7 @@ def build_forecast_dataset(page_payloads: dict, api_payloads: dict, crawl_time: 
                     "wind_level": api_record.get("wind_level"),
                     "precipitation_mm": precipitation_mm,
                     "rain_flag": infer_rain_flag(api_record.get("weather_detail_api"), precipitation_mm),
-                    "aqi": None,
+                    "aqi": aqi_record.get("aqi"),
                     "source_type": "forecast",
                     "source_name": "open-meteo forecast fallback",
                     "crawl_time": crawl_time,

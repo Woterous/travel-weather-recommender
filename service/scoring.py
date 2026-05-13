@@ -1,13 +1,6 @@
 from __future__ import annotations
 
-
-DEFAULT_WEIGHTS_NO_AQI = {
-    "temperature": 0.30,
-    "rain": 0.25,
-    "wind": 0.10,
-    "weather": 0.10,
-    "history": 0.25,
-}
+from config.weights import LITERATURE_BASED_WEIGHTS_NO_AQI, LITERATURE_BASED_WEIGHTS_WITH_AQI
 
 
 def _normalize_weights(weights: dict, aqi_available: bool) -> dict:
@@ -20,7 +13,7 @@ def _normalize_weights(weights: dict, aqi_available: bool) -> dict:
 
 
 def build_weights(preferences: dict, aqi_available: bool = False) -> dict:
-    weights = dict(DEFAULT_WEIGHTS_NO_AQI)
+    weights = dict(LITERATURE_BASED_WEIGHTS_WITH_AQI if aqi_available else LITERATURE_BASED_WEIGHTS_NO_AQI)
     if preferences["rain_sensitivity"] == "high":
         weights["rain"] += 0.08
         weights["history"] += 0.02
@@ -56,6 +49,17 @@ def build_weights(preferences: dict, aqi_available: bool = False) -> dict:
         weights["history"] -= 0.04
         weights["weather"] -= 0.03
         weights["rain"] -= 0.03
+
+    if aqi_available:
+        if preferences["aqi_sensitivity"] == "high":
+            weights["aqi"] += 0.05
+            weights["temperature"] -= 0.02
+            weights["history"] -= 0.02
+            weights["weather"] -= 0.01
+        elif preferences["aqi_sensitivity"] == "low":
+            weights["aqi"] -= 0.04
+            weights["temperature"] += 0.02
+            weights["weather"] += 0.02
 
     return _normalize_weights(weights, aqi_available=aqi_available)
 
@@ -166,11 +170,17 @@ def score_history(history_baseline: dict | None) -> float:
 def score_aqi(aqi_value: float | None, preference: str) -> float:
     if aqi_value is None:
         return 0.0
-    if aqi_value <= 50:
+    try:
+        numeric_aqi = float(aqi_value)
+    except (TypeError, ValueError):
+        return 0.0
+    if numeric_aqi != numeric_aqi:
+        return 0.0
+    if numeric_aqi <= 50:
         base = 100
-    elif aqi_value <= 100:
+    elif numeric_aqi <= 100:
         base = 85
-    elif aqi_value <= 150:
+    elif numeric_aqi <= 150:
         base = 60
     else:
         base = 30

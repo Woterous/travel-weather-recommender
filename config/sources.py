@@ -31,6 +31,17 @@ def build_forecast_api_url(city: CityConfig) -> str:
     )
 
 
+def build_air_quality_api_url(city: CityConfig) -> str:
+    return (
+        "https://air-quality-api.open-meteo.com/v1/air-quality"
+        f"?latitude={city.latitude}"
+        f"&longitude={city.longitude}"
+        "&hourly=us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide"
+        "&forecast_days=5"
+        "&timezone=Asia%2FShanghai"
+    )
+
+
 def build_history_api_url(city: CityConfig, start_date: date, end_date: date) -> str:
     return (
         "https://archive-api.open-meteo.com/v1/archive"

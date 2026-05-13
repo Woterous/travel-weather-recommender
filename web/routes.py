@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from urllib.parse import urlencode
+import math
 
 from flask import Flask, flash, redirect, render_template, request, url_for
 
@@ -40,6 +41,16 @@ def _resolve_selected_date(requested_date: str | None, available_dates: list[str
     return available_dates[0]
 
 
+def _aqi_display(value) -> str:
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return "-"
+    if math.isnan(numeric):
+        return "-"
+    return f"{numeric:.0f}"
+
+
 def register_routes(app: Flask) -> None:
     @app.context_processor
     def inject_globals():
@@ -51,6 +62,7 @@ def register_routes(app: Flask) -> None:
             "preference_options": PREFERENCE_OPTIONS,
             "preference_label": preference_label,
             "query_with": query_with,
+            "aqi_display": _aqi_display,
         }
 
     @app.get("/")

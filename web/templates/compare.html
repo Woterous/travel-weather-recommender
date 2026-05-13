@@ -41,6 +41,7 @@
         <h3>{{ row_a.city_name }}</h3>
         <strong class="score-big">{{ row_a.score_total }}</strong>
         <p>{{ row_a.weather_detail }} · {{ row_a.avg_temp }}℃</p>
+        {% if aqi_available %}<p>AQI {{ aqi_display(row_a.aqi) }}</p>{% endif %}
     </div>
     <div class="card score-compare center">
         <h3>分差</h3>
@@ -51,6 +52,7 @@
         <h3>{{ row_b.city_name }}</h3>
         <strong class="score-big">{{ row_b.score_total }}</strong>
         <p>{{ row_b.weather_detail }} · {{ row_b.avg_temp }}℃</p>
+        {% if aqi_available %}<p>AQI {{ aqi_display(row_b.aqi) }}</p>{% endif %}
     </div>
 </section>
 

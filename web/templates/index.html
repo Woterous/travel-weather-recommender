@@ -53,6 +53,9 @@
             <li>{{ preference_label("temperature_preference", preferences["temperature_preference"]) }}</li>
             <li>{{ preference_label("wind_sensitivity", preferences["wind_sensitivity"]) }}</li>
             <li>{{ preference_label("travel_style", preferences["travel_style"]) }}</li>
+            {% if aqi_available %}
+            <li>{{ preference_label("aqi_sensitivity", preferences["aqi_sensitivity"]) }}</li>
+            {% endif %}
         </ul>
         <a class="button button-ghost" href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date) }}">调整偏好</a>
     </div>
@@ -116,7 +119,11 @@
             <span>#{{ row.rank }}</span>
         </div>
         <p class="weather-line">{{ row.weather_detail }} · 均温 {{ "%.1f"|format(row.avg_temp) }}℃</p>
-        <p class="muted">风力 {{ row.wind_level if row.wind_level is not none else "-" }} 级 · {{ "有雨" if row.rain_flag else "少雨" }}</p>
+        <p class="muted">
+            风力 {{ row.wind_level if row.wind_level is not none else "-" }} 级 ·
+            {{ "有雨" if row.rain_flag else "少雨" }}
+            {% if aqi_available %} · AQI {{ aqi_display(row.aqi) }}{% endif %}
+        </p>
         <div class="city-card-foot">
             <strong class="score-big">{{ row.score_total }}</strong>
             <div class="card-actions">
