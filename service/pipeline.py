@@ -8,7 +8,7 @@ from crawler.fetcher import HttpClient
 from crawler.forecast_crawler import fetch_forecast_api, fetch_forecast_page
 from crawler.history_crawler import fetch_history_daily
 from crawler.parser_utils import to_iso_timestamp
-from service.clean_data import build_forecast_dataset, build_history_monthly_dataset, save_processed_artifacts
+from service.clean_data import build_forecast_dataset, build_history_monthly_dataset, save_processed_artifacts ##引用import数据清洗函数
 from service.database import log_refresh, write_dataframe
 
 
@@ -22,16 +22,16 @@ def _save_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def refresh_all_data() -> dict:
-    crawl_time = to_iso_timestamp()
+def refresh_all_data() -> dict:     ##开始刷新数据
+    crawl_time = to_iso_timestamp()     ##生成一次抓取时间 crawl_time
     client = HttpClient()
     page_payloads = {}
     api_payloads = {}
     history_payloads = {}
     errors = []
 
-    for city in CITIES:
-        try:
+    for city in CITIES:     ##遍历配置里的所有城市，对每个城市分别抓三类数据
+        try:        ##未来天气页面数据
             page_payload = fetch_forecast_page(city, client=client)
             page_payloads[city.slug] = page_payload
             suffix = crawl_time.replace(":", "-")
@@ -39,7 +39,7 @@ def refresh_all_data() -> dict:
         except Exception as exc:  # pragma: no cover
             errors.append(f"未来天气抓取失败: {city.name} -> {exc}")
 
-        try:
+        try:        ##未来天气 API 数据
             api_payload = fetch_forecast_api(city, client=client)
             api_payloads[city.slug] = api_payload
             suffix = crawl_time.replace(":", "-")
@@ -47,16 +47,16 @@ def refresh_all_data() -> dict:
         except Exception as exc:  # pragma: no cover
             errors.append(f"未来天气补充数据失败: {city.name} -> {exc}")
 
-        try:
+        try:        ##历史天气数据
             history_payload = fetch_history_daily(city, client=client)
             history_payloads[city.slug] = history_payload
             _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
         except Exception as exc:  # pragma: no cover
             errors.append(f"历史数据抓取失败: {city.name} -> {exc}")
 
-    forecast_df = build_forecast_dataset(page_payloads, api_payloads, crawl_time)
-    history_df = build_history_monthly_dataset(history_payloads, crawl_time)
-    save_processed_artifacts(forecast_df, history_df)
+    forecast_df = build_forecast_dataset(page_payloads, api_payloads, crawl_time)   ##把抓到的未来天气原始数据整理成表
+    history_df = build_history_monthly_dataset(history_payloads, crawl_time)    ##把抓到的历史日数据整理成“历史月度统计表”
+    save_processed_artifacts(forecast_df, history_df)   ##把整理后的结果保存成 CSV 文件
 
     if not forecast_df.empty:
         write_dataframe(forecast_df, "forecast_daily", replace=True)

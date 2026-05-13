@@ -170,7 +170,7 @@ def register_routes(app: Flask) -> None:
 
     @app.post("/refresh")
     def refresh():
-        result = refresh_all_data()
+        result = refresh_all_data() ##刷新数据路由
         if result["errors"]:
             flash(result["message"], "warning")
         else:

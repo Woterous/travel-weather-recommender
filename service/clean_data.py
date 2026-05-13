@@ -13,7 +13,7 @@ PROCESSED_DIR = BASE_DIR / "data" / "processed"
 
 def build_forecast_dataset(page_payloads: dict, api_payloads: dict, crawl_time: str) -> pd.DataFrame:
     rows = []
-    for city_slug in sorted(set(page_payloads) | set(api_payloads)):
+    for city_slug in sorted(set(page_payloads) | set(api_payloads)):    ##合并数据，优先用页面数据，缺失时用 API 补充
         page_payload = page_payloads.get(city_slug, {})
         api_map = {record["date"]: record for record in api_payloads.get(city_slug, {}).get("records", [])}
         page_dates = set()
@@ -33,13 +33,13 @@ def build_forecast_dataset(page_payloads: dict, api_payloads: dict, crawl_time: 
                     "max_temp": max_temp,
                     "min_temp": min_temp,
                     "avg_temp": avg_temp,
-                    "weather_type": normalize_weather_type(record.get("weather_detail")),
+                    "weather_type": normalize_weather_type(record.get("weather_detail")),   ##规范化天气类型
                     "weather_detail": record.get("weather_detail") or api_record.get("weather_detail_api"),
                     "wind_direction": record.get("wind_direction", ""),
                     "wind_speed_kmh": api_record.get("wind_speed_kmh"),
                     "wind_level": api_record.get("wind_level"),
                     "precipitation_mm": precipitation_mm,
-                    "rain_flag": infer_rain_flag(record.get("weather_detail"), precipitation_mm),
+                    "rain_flag": infer_rain_flag(record.get("weather_detail"), precipitation_mm),   ##判断是否下雨
                     "aqi": None,
                     "source_type": "forecast",
                     "source_name": "tianqi.com + open-meteo forecast",
@@ -48,7 +48,7 @@ def build_forecast_dataset(page_payloads: dict, api_payloads: dict, crawl_time: 
             )
             page_dates.add(record["date"])
 
-        for api_record in api_payloads.get(city_slug, {}).get("records", []):
+        for api_record in api_payloads.get(city_slug, {}).get("records", []):   ##统一字段类型、去重、排序
             if api_record["date"] in page_dates:
                 continue
             precipitation_mm = api_record.get("precipitation_mm", 0.0)
