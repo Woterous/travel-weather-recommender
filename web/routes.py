@@ -32,6 +32,14 @@ def _query_string(preferences: dict, extra: dict | None = None) -> str:
     return urlencode(params)
 
 
+def _resolve_selected_date(requested_date: str | None, available_dates: list[str]) -> str:
+    if not available_dates:
+        return ""
+    if requested_date and requested_date in available_dates:
+        return requested_date
+    return available_dates[0]
+
+
 def register_routes(app: Flask) -> None:
     @app.context_processor
     def inject_globals():
@@ -49,7 +57,7 @@ def register_routes(app: Flask) -> None:
     def home():
         repository = WeatherRepository()
         dates = repository.get_forecast_dates()
-        selected_date = request.args.get("date") or (dates[0] if dates else "")
+        selected_date = _resolve_selected_date(request.args.get("date"), dates)
         preferences = normalize_preferences(request.args)
         context = (
             build_homepage_context(repository, selected_date, preferences)
@@ -97,7 +105,7 @@ def register_routes(app: Flask) -> None:
         repository = WeatherRepository()
         preferences = normalize_preferences(request.args)
         dates = repository.get_forecast_dates()
-        selected_date = request.args.get("date") or (dates[0] if dates else "")
+        selected_date = _resolve_selected_date(request.args.get("date"), dates)
         context = build_city_detail_context(repository, city_slug, selected_date, preferences) if selected_date else {}
         return render_template(
             "city_detail.html",
@@ -114,7 +122,7 @@ def register_routes(app: Flask) -> None:
         repository = WeatherRepository()
         preferences = normalize_preferences(request.args)
         dates = repository.get_forecast_dates()
-        selected_date = request.args.get("date") or (dates[0] if dates else "")
+        selected_date = _resolve_selected_date(request.args.get("date"), dates)
         city_a = request.args.get("city_a") or DEFAULT_CITY_SLUG
         city_b = request.args.get("city_b") or "shanghai"
         context = build_compare_context(repository, city_a, city_b, selected_date, preferences) if selected_date else {}
