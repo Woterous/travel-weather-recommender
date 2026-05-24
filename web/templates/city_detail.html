@@ -43,7 +43,6 @@
         <div class="section-head"><h2>推荐结论</h2><span>总分 {{ selected.score_total }}</span></div>
         <p>{{ selected.reason }}</p>
         <ul class="tag-list">
-            <li>{{ "无 AQI 模式" if not aqi_available else "AQI 已启用" }}</li>
             <li>API规则分 {{ selected.rule_score }}</li>
             <li>历史ML预测评分 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
             <li>模型置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
