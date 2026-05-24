@@ -106,9 +106,10 @@ def register_routes(app: Flask) -> None:
             else {
                 "ranking": [],
                 "chart_data": {"cities": [], "scores": []},
+                "ml_predictions": [],
                 "weights_preview": {},
                 "aqi_available": False,
-                "model_summary": {"name": "KNN 旅游适宜度回归模型", "sample_count": 0, "mae": None},
+                "model_summary": {"name": "KNN 历史天气预测模型", "sample_count": 0, "mae": None},
             }
         )
         return render_template(

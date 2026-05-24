@@ -44,13 +44,54 @@
         <p>{{ selected.reason }}</p>
         <ul class="tag-list">
             <li>{{ "无 AQI 模式" if not aqi_available else "AQI 已启用" }}</li>
-            <li>规则分 {{ selected.rule_score }}</li>
-            <li>ML预测 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
+            <li>API规则分 {{ selected.rule_score }}</li>
+            <li>预测天气评分 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
             <li>模型置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
             <li>最近刷新 {{ latest_refresh.refresh_time }}</li>
         </ul>
     </div>
 </section>
+
+{% if selected.ml_weather %}
+<section class="content-grid">
+    <div class="card">
+        <div class="section-head"><h2>机器学习预测天气</h2><span>{{ selected.date }}</span></div>
+        <ul class="meta-list">
+            <li><span>预测天气</span><strong>{{ selected.ml_weather.weather_detail }}</strong></li>
+            <li><span>预测最高温</span><strong>{{ selected.ml_weather.max_temp }}℃</strong></li>
+            <li><span>预测最低温</span><strong>{{ selected.ml_weather.min_temp }}℃</strong></li>
+            <li><span>预测平均温</span><strong>{{ selected.ml_weather.avg_temp }}℃</strong></li>
+            <li><span>预测降雨概率</span><strong>{{ "%.0f%%"|format(selected.ml_weather.rain_probability * 100) }}</strong></li>
+            <li><span>预测风速</span><strong>{{ selected.ml_weather.wind_speed_kmh }} km/h</strong></li>
+            <li><span>预测风力</span><strong>{{ selected.ml_weather.wind_level }} 级</strong></li>
+            <li><span>预测天气评分</span><strong>{{ selected.ml_score }}</strong></li>
+        </ul>
+    </div>
+    <div class="card">
+        <div class="section-head"><h2>计算路径</h2><span>先预测天气，再评分</span></div>
+        <p>
+            模型从历史月度统计中寻找同城市、同月份的相似样本，预测未来日期的温度、降雨概率和风力。
+            然后把这些预测天气字段代入论文权重评分函数，得到当前展示的推荐分。
+        </p>
+        <ul class="tag-list">
+            <li>API天气规则分 {{ selected.rule_score }}</li>
+            <li>ML预测天气评分 {{ selected.ml_score }}</li>
+            <li>置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
+        </ul>
+    </div>
+</section>
+
+<section class="content-grid">
+    <div class="card chart-card">
+        <div class="section-head"><h2>预测温度对比</h2><span>近 7 天</span></div>
+        <div id="ml-temp-chart" class="chart"></div>
+    </div>
+    <div class="card chart-card">
+        <div class="section-head"><h2>预测评分与降雨概率</h2><span>近 7 天</span></div>
+        <div id="ml-weather-chart" class="chart"></div>
+    </div>
+</section>
+{% endif %}
 
 <section class="content-grid">
     <div class="card chart-card">
@@ -100,6 +141,22 @@ window.renderLineChart("trend-chart", {
         { name: "平均温度", values: {{ trend_chart["temps"] | tojson }} }
     ],
     title: "未来趋势"
+});
+window.renderLineChart("ml-temp-chart", {
+    labels: {{ ml_weather_chart["dates"] | tojson }},
+    series: [
+        { name: "API预报均温", values: {{ ml_weather_chart["api_temps"] | tojson }} },
+        { name: "ML预测均温", values: {{ ml_weather_chart["ml_temps"] | tojson }} }
+    ],
+    title: "API预报与机器学习预测温度"
+});
+window.renderLineChart("ml-weather-chart", {
+    labels: {{ ml_weather_chart["dates"] | tojson }},
+    series: [
+        { name: "预测天气评分", values: {{ ml_weather_chart["ml_scores"] | tojson }} },
+        { name: "预测降雨概率%", values: {{ ml_weather_chart["rain_probabilities"] | tojson }} }
+    ],
+    title: "机器学习天气预测结果"
 });
 window.renderLineChart("history-chart", {
     labels: {{ history_chart["months"] | tojson }},

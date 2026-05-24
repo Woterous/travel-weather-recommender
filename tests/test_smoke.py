@@ -12,7 +12,7 @@ from app import app
 from config.cities import CityConfig
 from service.city_search import city_from_search_payload
 from service.clean_data import build_forecast_dataset
-from service.ml_predictor import TravelSuitabilityKnnModel
+from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
 from service import pipeline
 from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
@@ -138,6 +138,41 @@ class SearchAndModelTest(unittest.TestCase):
 
         self.assertIsNotNone(prediction["ml_score"])
         self.assertGreater(prediction["ml_confidence"], 0)
+
+    def test_weather_knn_model_predicts_weather_fields(self) -> None:
+        import pandas as pd
+
+        history_df = pd.DataFrame(
+            [
+                {
+                    "city_slug": "xiamen",
+                    "city_name": "厦门",
+                    "month_num": 5,
+                    "avg_temp": 24,
+                    "rainy_ratio": 0.3,
+                    "temp_std": 3,
+                    "avg_wind_speed_kmh": 14,
+                },
+                {
+                    "city_slug": "xiamen",
+                    "city_name": "厦门",
+                    "month_num": 6,
+                    "avg_temp": 27,
+                    "rainy_ratio": 0.5,
+                    "temp_std": 4,
+                    "avg_wind_speed_kmh": 16,
+                },
+            ]
+        )
+        model = WeatherKnnForecastModel(history_df, neighbors=1)
+        prediction = model.predict({"city_slug": "xiamen", "city_name": "厦门", "date": "2026-05-25"})
+
+        self.assertIsNotNone(prediction)
+        self.assertEqual(prediction["city_name"], "厦门")
+        self.assertIn("avg_temp", prediction)
+        self.assertIn("rain_probability", prediction)
+        self.assertIn("wind_speed_kmh", prediction)
+        self.assertGreater(prediction["confidence"], 0)
 
 
 class RefreshProgressTest(unittest.TestCase):

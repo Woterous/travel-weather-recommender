@@ -3,7 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from service.history_analysis import build_history_baseline_lookup
-from service.ml_predictor import TravelSuitabilityKnnModel, build_model_summary, predict_row_score
+from service.ml_predictor import WeatherKnnForecastModel, build_model_summary
 from service.reason_generator import generate_reason, generate_summary
 from service.scoring import build_weights, score_record
 
@@ -31,15 +31,20 @@ def build_ranked_records(
     if forecast_df.empty:
         return []
     baseline_lookup = build_history_baseline_lookup(history_df)
-    ml_model = TravelSuitabilityKnnModel(history_df)
+    ml_weather_model = WeatherKnnForecastModel(history_df)
     scored_rows = []
     for row in forecast_df.to_dict("records"):
         history_baseline = baseline_lookup.get((row["city_slug"], _month_from_date(row["date"])))
         score_card = score_record(row, history_baseline, preferences, aqi_available=aqi_available)
-        prediction = predict_row_score(row, history_baseline, ml_model)
+        ml_weather = ml_weather_model.predict(row)
+        ml_score_card = (
+            score_record(ml_weather, history_baseline, preferences, aqi_available=aqi_available)
+            if ml_weather
+            else None
+        )
         rule_score = score_card["total"]
-        ml_score = prediction["ml_score"]
-        final_score = rule_score if ml_score is None else round(rule_score * 0.75 + ml_score * 0.25, 1)
+        ml_score = ml_score_card["total"] if ml_score_card else None
+        final_score = ml_score if ml_score is not None else rule_score
         reason = generate_reason(row, score_card["breakdown"], preferences, history_baseline)
         scored_rows.append(
             {
@@ -47,7 +52,9 @@ def build_ranked_records(
                 "score_total": final_score,
                 "rule_score": rule_score,
                 "ml_score": ml_score,
-                "ml_confidence": prediction["ml_confidence"],
+                "ml_confidence": ml_weather["confidence"] if ml_weather else 0.0,
+                "ml_weather": ml_weather or {},
+                "ml_score_breakdown": ml_score_card["breakdown"] if ml_score_card else {},
                 "score_breakdown": score_card["breakdown"],
                 "weights": score_card["weights"],
                 "reason": reason,
@@ -98,6 +105,16 @@ def build_city_detail_context(repository, city_slug: str, selected_date: str, pr
         "scores": [row["score_total"] for row in scored_series],
         "temps": [row["avg_temp"] for row in scored_series],
     }
+    ml_weather_chart = {
+        "dates": [row["date"] for row in scored_series],
+        "api_temps": [row["avg_temp"] for row in scored_series],
+        "ml_temps": [row.get("ml_weather", {}).get("avg_temp") for row in scored_series],
+        "ml_scores": [row.get("ml_score") for row in scored_series],
+        "rain_probabilities": [
+            round(float(row.get("ml_weather", {}).get("rain_probability", 0.0)) * 100, 1)
+            for row in scored_series
+        ],
+    }
     breakdown_chart = {
         "labels": [label_map[dimension] for dimension in selected_row["score_breakdown"].keys()] if selected_row else [],
         "values": [item["score"] for item in selected_row["score_breakdown"].values()] if selected_row else [],
@@ -120,6 +137,7 @@ def build_city_detail_context(repository, city_slug: str, selected_date: str, pr
         "history_series": history_series,
         "trend_chart": trend_chart,
         "breakdown_chart": breakdown_chart,
+        "ml_weather_chart": ml_weather_chart,
         "history_chart": history_chart,
         "aqi_available": aqi_available,
         "model_summary": build_model_summary(history_df),

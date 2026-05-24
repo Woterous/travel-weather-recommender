@@ -76,7 +76,7 @@
         <ul class="weight-list">
             <li><span>模型</span><strong>{{ model_summary.name }}</strong></li>
             <li><span>训练样本</span><strong>{{ model_summary.sample_count }}</strong></li>
-            <li><span>MAE</span><strong>{{ model_summary.mae if model_summary.mae is not none else "-" }}</strong></li>
+            <li><span>预测目标</span><strong>温度 / 降雨 / 风力</strong></li>
         </ul>
     </div>
 </section>
@@ -148,10 +148,14 @@
         <div>
             <span class="rank-badge">ML Top 1</span>
             <h3>{{ primary_ml.city_name }}</h3>
-            <p>{{ primary_ml.weather_detail }} · 均温 {{ "%.1f"|format(primary_ml.avg_temp) }}℃ · {{ "有雨" if primary_ml.rain_flag else "少雨" }}</p>
+            <p>
+                {{ primary_ml.ml_weather.weather_detail }} ·
+                预测均温 {{ "%.1f"|format(primary_ml.ml_weather.avg_temp) }}℃ ·
+                预测降雨概率 {{ "%.0f%%"|format(primary_ml.ml_weather.rain_probability * 100) }}
+            </p>
         </div>
         <div class="ml-score-box">
-            <span>ML预测分</span>
+            <span>预测天气评分</span>
             <strong>{{ primary_ml.ml_score }}</strong>
             <small>置信度 {{ "%.0f%%"|format(primary_ml.ml_confidence * 100) }}</small>
         </div>
@@ -164,16 +168,16 @@
                 <span>{{ row.ml_score }}</span>
             </div>
             <ul class="weather-metrics">
-                <li><span>天气</span><strong>{{ row.weather_detail }}</strong></li>
-                <li><span>平均温度</span><strong>{{ "%.1f"|format(row.avg_temp) }}℃</strong></li>
-                <li><span>降雨判断</span><strong>{{ "有雨" if row.rain_flag else "少雨" }}</strong></li>
-                <li><span>风力</span><strong>{{ row.wind_level if row.wind_level is not none else "-" }} 级</strong></li>
+                <li><span>预测天气</span><strong>{{ row.ml_weather.weather_detail }}</strong></li>
+                <li><span>预测平均温度</span><strong>{{ "%.1f"|format(row.ml_weather.avg_temp) }}℃</strong></li>
+                <li><span>预测降雨概率</span><strong>{{ "%.0f%%"|format(row.ml_weather.rain_probability * 100) }}</strong></li>
+                <li><span>预测风力</span><strong>{{ row.ml_weather.wind_level }} 级</strong></li>
                 {% if aqi_available %}
-                <li><span>AQI</span><strong>{{ aqi_display(row.aqi) }}</strong></li>
+                <li><span>AQI</span><strong>{{ aqi_display(row.ml_weather.aqi) }}</strong></li>
                 {% endif %}
                 <li><span>置信度</span><strong>{{ "%.0f%%"|format(row.ml_confidence * 100) }}</strong></li>
             </ul>
-            <p class="muted">最终分 {{ row.score_total }} = 规则分 {{ row.rule_score }} × 75% + ML预测 {{ row.ml_score }} × 25%</p>
+            <p class="muted">推荐分 {{ row.score_total }} 由机器学习预测天气重新代入论文权重计算；API 实时规则分 {{ row.rule_score }} 用作对照。</p>
         </article>
         {% endfor %}
     </div>
@@ -223,7 +227,7 @@
             {{ "有雨" if row.rain_flag else "少雨" }}
             {% if aqi_available %} · AQI {{ aqi_display(row.aqi) }}{% endif %}
         </p>
-        <p class="muted">规则分 {{ row.rule_score }} · ML预测 {{ row.ml_score if row.ml_score is not none else "-" }} · 置信度 {{ "%.0f%%"|format(row.ml_confidence * 100) }}</p>
+        <p class="muted">API规则分 {{ row.rule_score }} · 预测天气评分 {{ row.ml_score if row.ml_score is not none else "-" }} · 置信度 {{ "%.0f%%"|format(row.ml_confidence * 100) }}</p>
         <div class="city-card-foot">
             <strong class="score-big">{{ row.score_total }}</strong>
             <div class="card-actions">
