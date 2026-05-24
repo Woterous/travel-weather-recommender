@@ -6,7 +6,7 @@
 <section class="hero-panel">
     <div class="hero-copy">
         <p class="eyebrow">首页兼排行榜页</p>
-        <h1>固定 10 城市的旅游出行推荐</h1>
+        <h1>全国城市的旅游出行推荐</h1>
         <p>
             页面默认读取本地 SQLite 数据，不会在每次访问时实时抓取。
             需要更新数据时，使用右侧的手动刷新按钮。
@@ -144,8 +144,8 @@
     </div>
     <div class="card ranking-card">
         <div class="section-head">
-            <h2>Top 10 城市</h2>
-            <span>展示本地缓存结果</span>
+            <h2>推荐前 10 城市</h2>
+            <span>展示本地缓存与搜索刷新结果</span>
         </div>
         <ol class="ranking-list">
             {% for row in ranking %}
