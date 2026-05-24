@@ -288,6 +288,16 @@ def register_routes(app: Flask) -> None:
             flash(f"{city.name} 数据刷新完成。", "success")
         return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences))
 
+    @app.get("/api/cities/search")
+    def city_search_api():
+        query = request.args.get("q", "").strip()
+        if not query:
+            return jsonify({"results": []})
+        try:
+            return jsonify({"results": search_cities(query)})
+        except Exception as exc:
+            return jsonify({"results": [], "error": f"城市联想暂时不可用：{exc}"}), 200
+
     @app.post("/api/assistant")
     def assistant_api():
         payload = request.get_json(silent=True) or {}

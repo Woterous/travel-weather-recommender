@@ -177,6 +177,75 @@ a {
     gap: 12px;
 }
 
+.search-hero {
+    display: grid;
+    grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr);
+    gap: 24px;
+    align-items: center;
+    padding: clamp(24px, 4vw, 42px);
+    background:
+        radial-gradient(circle at 88% 20%, rgba(217, 140, 63, 0.22), transparent 28%),
+        linear-gradient(135deg, rgba(22, 90, 114, 0.12), rgba(255, 252, 247, 0.94) 54%);
+}
+
+.search-hero-copy h2 {
+    margin: 0 0 10px;
+    font-size: clamp(1.8rem, 3vw, 3rem);
+}
+
+.search-hero-form {
+    display: grid;
+    gap: 14px;
+}
+
+.search-input-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+}
+
+.search-input-row input[type="text"] {
+    min-height: 56px;
+    border-radius: 20px;
+    font-size: 1.05rem;
+}
+
+.search-input-row .button {
+    min-width: 132px;
+}
+
+.search-suggestions {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.search-suggestion {
+    display: grid;
+    gap: 6px;
+    min-height: 82px;
+    padding: 14px;
+    text-align: left;
+    border: 1px solid rgba(22, 90, 114, 0.16);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--ink);
+    cursor: pointer;
+    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.search-suggestion:hover {
+    transform: translateY(-2px);
+    border-color: rgba(22, 90, 114, 0.42);
+    background: rgba(255, 255, 255, 0.94);
+}
+
+.search-suggestion span {
+    color: var(--muted);
+    font-size: 0.86rem;
+    line-height: 1.35;
+}
+
 select,
 button,
 input {
@@ -657,9 +726,14 @@ input[type="text"] {
     .two-column,
     .compare-overview,
     .ml-weather-grid,
+    .search-hero,
     .search-result-grid,
     .city-grid {
         grid-template-columns: 1fr;
+    }
+
+    .search-suggestions {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
     }
 }
 
@@ -682,6 +756,11 @@ input[type="text"] {
     }
 
     .ml-primary {
+        grid-template-columns: 1fr;
+    }
+
+    .search-input-row,
+    .search-suggestions {
         grid-template-columns: 1fr;
     }
 

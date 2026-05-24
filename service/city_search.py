@@ -7,6 +7,28 @@ from config.sources import build_geocoding_api_url
 from crawler.fetcher import HttpClient
 
 
+CURATED_CITY_SUGGESTIONS = [
+    CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25),
+    CityConfig("geo-1811720", "广元", "guangyuan", 32.44201, 105.823),
+    CityConfig("geo-1812256", "广安", "guangan", 30.47413, 106.63696),
+    CityConfig("geo-10179231", "广陵", "guangling", 32.39358, 119.43157),
+    CityConfig("geo-1806466", "广德", "guangde", 30.89371, 119.41705),
+    CityConfig("geo-1814906", "长沙", "changsha", 28.19874, 112.97087),
+    CityConfig("geo-1795565", "苏州", "suzhou", 31.30408, 120.59538),
+    CityConfig("geo-1816670", "深圳", "shenzhen", 22.54554, 114.0683),
+]
+
+
+def _city_to_search_result(city: CityConfig, province: str, source: str, country: str = "中国") -> dict:
+    return {
+        **asdict(city),
+        "province": province,
+        "country": country,
+        "source": source,
+        "display_name": " · ".join(part for part in [city.name, province, country] if part),
+    }
+
+
 def _geo_slug(record: dict) -> str:
     geo_id = record.get("id")
     if geo_id:
@@ -32,21 +54,24 @@ def search_cities(query: str, client: HttpClient | None = None) -> list[dict]:
         return []
 
     fixed_matches = [
-        {
-            **asdict(city),
-            "province": "内置城市",
-            "country": "中国",
-            "source": "local",
-            "display_name": city.name,
-        }
+        _city_to_search_result(city, province="内置城市", source="local")
         for city in CITIES
+        if cleaned.lower() in city.name.lower() or cleaned.lower() in city.pinyin.lower()
+    ]
+    curated_matches = [
+        _city_to_search_result(city, province="联想城市", source="local suggestion")
+        for city in CURATED_CITY_SUGGESTIONS
         if cleaned.lower() in city.name.lower() or cleaned.lower() in city.pinyin.lower()
     ]
 
     http_client = client or HttpClient()
-    payload = http_client.get_json(build_geocoding_api_url(cleaned))
+    payload = {"results": []}
+    try:
+        payload = http_client.get_json(build_geocoding_api_url(cleaned))
+    except Exception:
+        payload = {"results": []}
     remote_matches = []
-    seen_slugs = {item["slug"] for item in fixed_matches}
+    seen_slugs = {item["slug"] for item in fixed_matches + curated_matches}
     for record in payload.get("results", []) or []:
         if "latitude" not in record or "longitude" not in record:
             continue
@@ -66,7 +91,7 @@ def search_cities(query: str, client: HttpClient | None = None) -> list[dict]:
             }
         )
 
-    return (fixed_matches + remote_matches)[:8]
+    return (fixed_matches + curated_matches + remote_matches)[:8]
 
 
 def city_from_search_payload(payload: dict) -> CityConfig:

@@ -31,18 +31,28 @@
     </div>
 </section>
 
-<section class="controls-grid">
-    <form method="get" action="{{ url_for('home') }}" class="card filter-form">
-        <h3>全城搜索</h3>
-        <label>城市名称</label>
-        <input type="text" name="q" value="{{ search_query }}" placeholder="输入城市名，例如 广州 / 苏州 / Tokyo">
+<section class="search-hero card">
+    <div class="search-hero-copy">
+        <p class="eyebrow">全城搜索</p>
+        <h2>输入一个字，快速联想目的地</h2>
+        <p>支持中文、拼音和英文城市名，例如“广”会优先推荐广州、广陵等候选城市。</p>
+    </div>
+    <form method="get" action="{{ url_for('home') }}" class="search-hero-form" data-city-search-form data-search-url="{{ url_for('city_search_api') }}" data-refresh-url="{{ url_for('refresh_city') }}">
+        <label for="city-search-input">城市名称</label>
+        <div class="search-input-row">
+            <input id="city-search-input" type="text" name="q" value="{{ search_query }}" placeholder="输入城市名，例如 广 / 广州 / Suzhou / Tokyo" autocomplete="off" data-city-search-input>
+            <button type="submit" class="button button-primary">搜索城市</button>
+        </div>
+        <div class="search-suggestions" data-city-search-suggestions aria-live="polite"></div>
+        <p class="muted" data-city-search-empty hidden>没有找到匹配城市，可以尝试输入更完整的城市名。</p>
         {% for key, value in preferences.items() %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endfor %}
         <input type="hidden" name="date" value="{{ selected_date }}">
-        <button type="submit" class="button button-primary">搜索城市</button>
     </form>
+</section>
 
+<section class="controls-grid">
     <form method="get" action="{{ url_for('home') }}" class="card filter-form">
         <h3>筛选条件</h3>
         <label>日期</label>

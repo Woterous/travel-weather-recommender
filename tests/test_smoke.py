@@ -12,6 +12,7 @@ if str(ROOT_DIR) not in sys.path:
 from app import app
 from config.cities import CityConfig
 from service.city_search import city_from_search_payload
+from service.city_search import search_cities
 from service.clean_data import build_forecast_dataset, build_history_daily_dataset
 from service.database import _sanitize_refresh_message
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
@@ -102,6 +103,24 @@ class SearchAndModelTest(unittest.TestCase):
 
         self.assertEqual(city.slug, "geo-1809858")
         self.assertEqual(city.name, "广州")
+
+    def test_city_search_suggests_curated_matches_for_single_character(self) -> None:
+        class FailingClient:
+            def get_json(self, _url):
+                raise RuntimeError("network unavailable")
+
+        results = search_cities("广", client=FailingClient())
+        names = [item["name"] for item in results]
+
+        self.assertIn("广州", names)
+        self.assertIn("广陵", names)
+
+    def test_city_search_api_returns_json_results(self) -> None:
+        with mock.patch("web.routes.search_cities", return_value=[{"name": "广州", "slug": "geo-1809858"}]):
+            response = app.test_client().get("/api/cities/search?q=广")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["results"][0]["name"], "广州")
 
     def test_knn_model_predicts_score(self) -> None:
         import pandas as pd
