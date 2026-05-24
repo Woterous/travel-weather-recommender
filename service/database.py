@@ -229,6 +229,39 @@ class WeatherRepository:
             )
         return self._read_df("SELECT * FROM history_daily ORDER BY city_slug, date")
 
+    def get_history_daily_coverage(self, city_slug: str) -> dict:
+        df = self._read_df(
+            """
+            SELECT COUNT(*) AS row_count, MIN(date) AS start_date, MAX(date) AS end_date
+            FROM history_daily
+            WHERE city_slug = ?
+            """,
+            (city_slug,),
+        )
+        if df.empty:
+            return {"row_count": 0, "start_date": None, "end_date": None}
+        row = df.iloc[0].to_dict()
+        return {
+            "row_count": int(row.get("row_count") or 0),
+            "start_date": row.get("start_date"),
+            "end_date": row.get("end_date"),
+        }
+
+    def get_data_version(self) -> str:
+        df = self._read_df(
+            """
+            SELECT
+                COALESCE((SELECT MAX(crawl_time) FROM forecast_daily), '') AS forecast_version,
+                COALESCE((SELECT MAX(crawl_time) FROM history_daily), '') AS history_version,
+                COALESCE((SELECT COUNT(*) FROM forecast_daily), 0) AS forecast_rows,
+                COALESCE((SELECT COUNT(*) FROM history_daily), 0) AS history_rows
+            """
+        )
+        if df.empty:
+            return "empty"
+        row = df.iloc[0]
+        return f"{row['forecast_version']}|{row['history_version']}|{row['forecast_rows']}|{row['history_rows']}"
+
     def get_latest_refresh_info(self) -> dict:
         df = self._read_df(
             "SELECT refresh_time, status, message FROM refresh_log ORDER BY id DESC LIMIT 1"

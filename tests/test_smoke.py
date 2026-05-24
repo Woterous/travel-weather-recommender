@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import unittest
+from datetime import date
 from unittest import mock
 
 
@@ -303,9 +304,11 @@ class RefreshProgressTest(unittest.TestCase):
             mock.patch.object(pipeline, "fetch_forecast_api", return_value=api_payload), \
             mock.patch.object(pipeline, "fetch_air_quality_api", return_value=aqi_payload), \
             mock.patch.object(pipeline, "fetch_history_daily", return_value=history_payload), \
+            mock.patch.object(pipeline, "_history_cache_is_current", return_value=False), \
             mock.patch.object(pipeline, "_save_json"), \
             mock.patch.object(pipeline, "save_processed_artifacts"), \
             mock.patch.object(pipeline, "write_dataframe"), \
+            mock.patch.object(pipeline, "write_city_dataframe"), \
             mock.patch.object(pipeline, "log_refresh"):
             result = pipeline.refresh_all_data()
 
@@ -335,6 +338,40 @@ class RefreshProgressTest(unittest.TestCase):
         )
 
         self.assertEqual(message, "历史数据暂时不可用：三亚 请求过于频繁，本次未更新，请稍后重试。")
+
+    def test_history_cache_current_when_covered_to_last_month(self) -> None:
+        repository = mock.Mock()
+        repository.get_history_daily_coverage.return_value = {
+            "row_count": 1200,
+            "start_date": "2021-01-01",
+            "end_date": "2026-04-30",
+        }
+
+        with mock.patch.object(
+            pipeline,
+            "default_history_range",
+            return_value=(date(2021, 1, 1), date(2026, 4, 30)),
+        ):
+            is_current = pipeline._history_cache_is_current(repository, "sanya")
+
+        self.assertTrue(is_current)
+
+    def test_history_cache_stale_when_last_month_missing(self) -> None:
+        repository = mock.Mock()
+        repository.get_history_daily_coverage.return_value = {
+            "row_count": 1200,
+            "start_date": "2021-01-01",
+            "end_date": "2026-03-31",
+        }
+
+        with mock.patch.object(
+            pipeline,
+            "default_history_range",
+            return_value=(date(2021, 1, 1), date(2026, 4, 30)),
+        ):
+            is_current = pipeline._history_cache_is_current(repository, "sanya")
+
+        self.assertFalse(is_current)
 
 
 if __name__ == "__main__":

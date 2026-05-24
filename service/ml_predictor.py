@@ -152,31 +152,83 @@ class WeatherKnnForecastModel:
         self.daily_samples = self._build_daily_samples(daily_df)
         self.monthly_samples = self._build_monthly_samples(monthly_df)
         self.samples = self.daily_samples or self.monthly_samples
+        self.daily_by_city = self._group_samples_by_city(self.daily_samples)
+        self.monthly_by_city = self._group_samples_by_city(self.monthly_samples)
+        self.recent_daily_cache = {
+            city_slug: self._build_recent_daily_stats(samples)
+            for city_slug, samples in self.daily_by_city.items()
+        }
+        self.recent_monthly_cache = {
+            city_slug: self._build_recent_monthly_stats(samples)
+            for city_slug, samples in self.monthly_by_city.items()
+        }
+        self.seasonal_average_cache: dict[tuple[str, int, str], float | None] = {}
+
+    def _group_samples_by_city(self, samples: list[dict]) -> dict[str, list[dict]]:
+        grouped: dict[str, list[dict]] = {}
+        for sample in samples:
+            grouped.setdefault(str(sample.get("city_slug")), []).append(sample)
+        for city_samples in grouped.values():
+            city_samples.sort(key=lambda sample: sample.get("date") or str(sample.get("month_key") or ""))
+        return grouped
 
     def _build_daily_samples(self, history_df: pd.DataFrame) -> list[dict]:
         if history_df.empty:
             return []
+        working = history_df.copy()
+        working["date_value"] = pd.to_datetime(working.get("date"), errors="coerce")
+        working = working[working["date_value"].notna()].copy()
+        if working.empty:
+            return []
+        for column, default in [
+            ("max_temp", 20.0),
+            ("min_temp", 20.0),
+            ("avg_temp", 20.0),
+            ("rain_flag", 0.0),
+            ("precipitation_mm", 0.0),
+            ("avg_wind_speed_kmh", 12.0),
+            ("wind_speed_kmh", 12.0),
+        ]:
+            if column not in working:
+                working[column] = default
+            working[column] = pd.to_numeric(working[column], errors="coerce").fillna(default)
+        if "month_num" not in working:
+            working["month_num"] = working["date_value"].dt.month
+        if "day_of_year" not in working:
+            working["day_of_year"] = working["date_value"].dt.dayofyear
+
         samples = []
-        for row in history_df.to_dict("records"):
-            date_value = pd.to_datetime(row.get("date"), errors="coerce")
-            if pd.isna(date_value):
-                continue
-            max_temp = _safe_float(row.get("max_temp"), _safe_float(row.get("avg_temp"), 20.0))
-            min_temp = _safe_float(row.get("min_temp"), _safe_float(row.get("avg_temp"), 20.0))
-            avg_temp = _safe_float(row.get("avg_temp"), (max_temp + min_temp) / 2)
+        columns = [
+            "city_slug",
+            "city_name",
+            "date_value",
+            "month_num",
+            "day_of_year",
+            "max_temp",
+            "min_temp",
+            "avg_temp",
+            "rain_flag",
+            "precipitation_mm",
+            "avg_wind_speed_kmh",
+            "wind_speed_kmh",
+        ]
+        for row in working[columns].itertuples(index=False):
+            max_temp = float(row.max_temp)
+            min_temp = float(row.min_temp)
+            avg_temp = float(row.avg_temp)
             samples.append(
                 {
-                    "city_slug": row.get("city_slug"),
-                    "city_name": row.get("city_name"),
-                    "date": date_value,
-                    "month_num": int(_safe_float(row.get("month_num"), date_value.month)),
-                    "day_of_year": int(_safe_float(row.get("day_of_year"), date_value.dayofyear)),
+                    "city_slug": row.city_slug,
+                    "city_name": row.city_name,
+                    "date": row.date_value,
+                    "month_num": int(_safe_float(row.month_num, row.date_value.month)),
+                    "day_of_year": int(_safe_float(row.day_of_year, row.date_value.dayofyear)),
                     "avg_temp": avg_temp,
                     "temp_half_range": max(1.5, min(9.0, (max_temp - min_temp) / 2)),
-                    "rain_flag": _safe_float(row.get("rain_flag"), 0.0),
-                    "precipitation_mm": _safe_float(row.get("precipitation_mm"), 0.0),
-                    "avg_wind_speed_kmh": _safe_float(row.get("avg_wind_speed_kmh"), 12.0),
-                    "wind_speed_kmh": _safe_float(row.get("wind_speed_kmh"), 12.0),
+                    "rain_flag": float(row.rain_flag),
+                    "precipitation_mm": float(row.precipitation_mm),
+                    "avg_wind_speed_kmh": float(row.avg_wind_speed_kmh),
+                    "wind_speed_kmh": float(row.wind_speed_kmh),
                 }
             )
         return samples
@@ -209,11 +261,7 @@ class WeatherKnnForecastModel:
         day_gap = min(day_gap, 366 - day_gap)
         return city_penalty + day_gap / 45.0
 
-    def _recent_daily_stats(self, city_slug: str) -> dict:
-        city_samples = sorted(
-            [sample for sample in self.daily_samples if sample["city_slug"] == city_slug],
-            key=lambda sample: sample["date"],
-        )
+    def _build_recent_daily_stats(self, city_samples: list[dict]) -> dict:
         if len(city_samples) < 14:
             return {}
         recent_60 = city_samples[-60:]
@@ -237,11 +285,9 @@ class WeatherKnnForecastModel:
             "recent_wind_speed": max(0.0, avg(recent_30, "wind_speed_kmh")),
         }
 
-    def _recent_monthly_stats(self, city_slug: str) -> dict:
-        city_samples = [sample for sample in self.monthly_samples if sample["city_slug"] == city_slug]
+    def _build_recent_monthly_stats(self, city_samples: list[dict]) -> dict:
         if len(city_samples) < 2:
             return {}
-        city_samples = sorted(city_samples, key=lambda sample: str(sample.get("month_key") or sample.get("month_num")))
         latest = city_samples[-1]
         previous = city_samples[-2]
         return {
@@ -256,9 +302,12 @@ class WeatherKnnForecastModel:
         }
 
     def _seasonal_average(self, city_slug: str, day_of_year: int, key: str) -> float | None:
-        samples = self.daily_samples or self.monthly_samples
-        city_samples = [sample for sample in samples if sample["city_slug"] == city_slug]
+        cache_key = (city_slug, day_of_year, key)
+        if cache_key in self.seasonal_average_cache:
+            return self.seasonal_average_cache[cache_key]
+        city_samples = self.daily_by_city.get(city_slug) or self.monthly_by_city.get(city_slug) or []
         if not city_samples:
+            self.seasonal_average_cache[cache_key] = None
             return None
         ranked = sorted(
             (
@@ -269,7 +318,9 @@ class WeatherKnnForecastModel:
         )[: min(self.neighbors, len(city_samples))]
         weights = [1 / (distance + 0.05) for distance, _value in ranked]
         total_weight = sum(weights)
-        return sum(weight * value for weight, (_distance, value) in zip(weights, ranked)) / total_weight
+        result = sum(weight * value for weight, (_distance, value) in zip(weights, ranked)) / total_weight
+        self.seasonal_average_cache[cache_key] = result
+        return result
 
     def predict(self, row: dict, series_context: dict | None = None) -> dict | None:
         if not self.samples:
@@ -279,8 +330,8 @@ class WeatherKnnForecastModel:
         if pd.isna(target_date):
             return None
         day_of_year = int(target_date.dayofyear)
-        city_slug = row.get("city_slug")
-        samples = self.daily_samples or self.monthly_samples
+        city_slug = str(row.get("city_slug"))
+        samples = self.daily_by_city.get(city_slug) or self.monthly_by_city.get(city_slug) or self.samples
         ranked = sorted(
             ((self._same_season_distance(city_slug, day_of_year, sample), sample) for sample in samples),
             key=lambda item: item[0],
@@ -297,7 +348,7 @@ class WeatherKnnForecastModel:
         temp_half_range = max(1.0, weighted_average("temp_half_range"))
         historical_wind_speed = max(0.0, weighted_average("wind_speed_kmh"))
 
-        recent = self._recent_daily_stats(city_slug) or self._recent_monthly_stats(city_slug)
+        recent = self.recent_daily_cache.get(city_slug) or self.recent_monthly_cache.get(city_slug) or {}
         if recent:
             seasonal_recent = self._seasonal_average(
                 city_slug,
@@ -362,13 +413,11 @@ class WeatherKnnForecastModel:
 
 
 def build_model_summary(history_df: pd.DataFrame, history_daily_df: pd.DataFrame | None = None) -> dict:
-    suitability_model = TravelSuitabilityKnnModel(history_df)
-    mae = suitability_model.evaluate_mae()
     daily_df = history_daily_df if history_daily_df is not None else pd.DataFrame()
     weather_model = WeatherKnnForecastModel(daily_df, history_monthly_df=history_df)
     return {
         "name": "历史日天气 KNN 预测模型",
         "sample_count": len(weather_model.samples),
-        "mae": mae,
+        "mae": None,
         "features": ["city_slug", "day_of_year", "recent_60_days", "avg_temp", "rain_probability", "wind_speed"],
     }

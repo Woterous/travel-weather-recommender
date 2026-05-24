@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+from functools import lru_cache
+
 import pandas as pd
 
+from service.database import WeatherRepository
 from service.history_analysis import build_history_baseline_lookup
 from service.ml_predictor import WeatherKnnForecastModel, build_model_summary
 from service.reason_generator import generate_reason, generate_summary
@@ -78,7 +81,26 @@ def build_ml_prediction_highlights(ranking: list[dict], limit: int = 3) -> list[
     return candidates[:limit]
 
 
+def _preferences_cache_key(preferences: dict) -> tuple[tuple[str, str], ...]:
+    return tuple(sorted((str(key), str(value)) for key, value in preferences.items()))
+
+
 def build_homepage_context(repository, selected_date: str, preferences: dict) -> dict:
+    return _build_homepage_context_cached(
+        selected_date,
+        _preferences_cache_key(preferences),
+        repository.get_data_version(),
+    )
+
+
+@lru_cache(maxsize=64)
+def _build_homepage_context_cached(
+    selected_date: str,
+    preferences_key: tuple[tuple[str, str], ...],
+    _data_version: str,
+) -> dict:
+    repository = WeatherRepository()
+    preferences = dict(preferences_key)
     forecast_df = repository.get_forecast_for_date(selected_date)
     history_df = repository.get_history_monthly()
     history_daily_df = repository.get_history_daily()
@@ -105,9 +127,26 @@ def build_homepage_context(repository, selected_date: str, preferences: dict) ->
 
 
 def build_city_detail_context(repository, city_slug: str, selected_date: str, preferences: dict) -> dict:
+    return _build_city_detail_context_cached(
+        city_slug,
+        selected_date,
+        _preferences_cache_key(preferences),
+        repository.get_data_version(),
+    )
+
+
+@lru_cache(maxsize=128)
+def _build_city_detail_context_cached(
+    city_slug: str,
+    selected_date: str,
+    preferences_key: tuple[tuple[str, str], ...],
+    _data_version: str,
+) -> dict:
+    repository = WeatherRepository()
+    preferences = dict(preferences_key)
     city_forecast = repository.get_city_forecast(city_slug)
     history_df = repository.get_history_monthly()
-    history_daily_df = repository.get_history_daily()
+    history_daily_df = repository.get_history_daily(city_slug)
     aqi_available = repository.aqi_available()
     scored_series = build_ranked_records(
         city_forecast,

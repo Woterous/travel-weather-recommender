@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from config.cities import CITIES
+from config.sources import default_history_range
 from crawler.air_quality_crawler import fetch_air_quality_api
 from crawler.fetcher import HttpClient
 from crawler.forecast_crawler import fetch_forecast_api, fetch_forecast_page
@@ -15,7 +16,7 @@ from service.clean_data import (
     build_history_monthly_dataset,
     save_processed_artifacts,
 ) ##引用import数据清洗函数
-from service.database import log_refresh, write_city_dataframe, write_dataframe
+from service.database import WeatherRepository, log_refresh, write_city_dataframe, write_dataframe
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -42,6 +43,12 @@ def _emit_progress(progress_callback, **payload) -> None:
         progress_callback(payload)
 
 
+def _history_cache_is_current(repository: WeatherRepository, city_slug: str) -> bool:
+    _start_date, end_date = default_history_range()
+    coverage = repository.get_history_daily_coverage(city_slug)
+    return coverage["row_count"] > 0 and str(coverage["end_date"] or "") >= end_date.isoformat()
+
+
 def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     crawl_time = to_iso_timestamp()     ##生成一次抓取时间 crawl_time
     client = HttpClient()
@@ -51,6 +58,8 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     history_payloads = {}
     errors = []
     warnings = []
+    skipped_history_cities = []
+    repository = WeatherRepository()
     total_steps = len(CITIES) * 4 + 5
     step = 0
 
@@ -154,21 +163,33 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
             next_step=f"下一步：抓取 {city.name} 的历史天气。",
         )
 
-        _emit_progress(
-            progress_callback,
-            status="running",
-            step=step + 1,
-            total=total_steps,
-            stage="历史天气",
-            message=f"正在抓取 {city.name} 的历史日天气，用于月度统计和机器学习预测。",
-            next_step="下一步：继续处理后续城市，或进入数据清洗。",
-        )
-        try:        ##历史天气数据
-            history_payload = fetch_history_daily(city, client=client)
-            history_payloads[city.slug] = history_payload
-            _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
-        except Exception as exc:  # pragma: no cover
-            errors.append(_friendly_fetch_error("历史数据", city.name, exc))
+        if _history_cache_is_current(repository, city.slug):
+            skipped_history_cities.append(city.name)
+            _emit_progress(
+                progress_callback,
+                status="running",
+                step=step + 1,
+                total=total_steps,
+                stage="历史天气",
+                message=f"{city.name} 历史日数据已覆盖到上个月，本次复用本地缓存。",
+                next_step="下一步：继续处理后续城市，或进入数据清洗。",
+            )
+        else:
+            _emit_progress(
+                progress_callback,
+                status="running",
+                step=step + 1,
+                total=total_steps,
+                stage="历史天气",
+                message=f"正在抓取 {city.name} 的历史日天气，用于月度统计和机器学习预测。",
+                next_step="下一步：继续处理后续城市，或进入数据清洗。",
+            )
+            try:        ##历史天气数据
+                history_payload = fetch_history_daily(city, client=client)
+                history_payloads[city.slug] = history_payload
+                _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
+            except Exception as exc:  # pragma: no cover
+                errors.append(_friendly_fetch_error("历史数据", city.name, exc))
 
         step += 1
         next_city_index = CITIES.index(city) + 1
@@ -211,8 +232,6 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
         message="正在保存 forecast_daily.csv、history_monthly.csv 和 history_daily.csv。",
         next_step="下一步：写入 SQLite 数据库。",
     )
-    save_processed_artifacts(forecast_df, history_df, history_daily_df)   ##把整理后的结果保存成 CSV 文件
-
     step += 1
     _emit_progress(
         progress_callback,
@@ -226,16 +245,24 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     if not forecast_df.empty:
         write_dataframe(forecast_df, "forecast_daily", replace=True)
     if not history_df.empty:
-        write_dataframe(history_df, "history_monthly", replace=True)
+        for city_slug in history_df["city_slug"].dropna().unique():
+            write_city_dataframe(history_df[history_df["city_slug"] == city_slug], "history_monthly", city_slug)
     if not history_daily_df.empty:
-        write_dataframe(history_daily_df, "history_daily", replace=True)
+        for city_slug in history_daily_df["city_slug"].dropna().unique():
+            write_city_dataframe(history_daily_df[history_daily_df["city_slug"] == city_slug], "history_daily", city_slug)
+
+    total_history_df = repository.get_history_monthly()
+    total_history_daily_df = repository.get_history_daily()
+    save_processed_artifacts(forecast_df, total_history_df, total_history_daily_df)   ##把整理后的结果保存成 CSV 文件
 
     step += 1
     aqi_rows = int(forecast_df["aqi"].notna().sum()) if not forecast_df.empty and "aqi" in forecast_df else 0
     status = "success" if not errors else "partial"
     message_parts = [
-        f"未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条，历史日样本 {len(history_daily_df)} 条。"
+        f"未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(total_history_df)} 条，历史日样本 {len(total_history_daily_df)} 条。"
     ]
+    if skipped_history_cities:
+        message_parts.append(f"历史数据已复用本地缓存 {len(skipped_history_cities)} 个城市。")
     if warnings:
         message_parts.append("网页天气源部分不可用，已使用 Open-Meteo API 兜底。")
     if errors:
@@ -266,8 +293,8 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
         "crawl_time": crawl_time,
         "forecast_rows": len(forecast_df),
         "aqi_rows": aqi_rows,
-        "history_rows": len(history_df),
-        "history_daily_rows": len(history_daily_df),
+        "history_rows": len(total_history_df),
+        "history_daily_rows": len(total_history_daily_df),
         "errors": errors,
         "warnings": warnings,
         "message": message,
@@ -281,6 +308,7 @@ def refresh_city_data(city) -> dict:
     air_quality_payloads = {}
     history_payloads = {}
     errors = []
+    repository = WeatherRepository()
 
     try:
         api_payload = fetch_forecast_api(city, client=client)
@@ -298,12 +326,14 @@ def refresh_city_data(city) -> dict:
     except Exception as exc:  # pragma: no cover
         errors.append(_friendly_fetch_error("AQI 数据", city.name, exc))
 
-    try:
-        history_payload = fetch_history_daily(city, client=client)
-        history_payloads[city.slug] = history_payload
-        _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
-    except Exception as exc:  # pragma: no cover
-        errors.append(_friendly_fetch_error("历史数据", city.name, exc))
+    history_reused = _history_cache_is_current(repository, city.slug)
+    if not history_reused:
+        try:
+            history_payload = fetch_history_daily(city, client=client)
+            history_payloads[city.slug] = history_payload
+            _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
+        except Exception as exc:  # pragma: no cover
+            errors.append(_friendly_fetch_error("历史数据", city.name, exc))
 
     forecast_df = build_forecast_dataset({}, api_payloads, crawl_time, air_quality_payloads)
     history_df = build_history_monthly_dataset(history_payloads, crawl_time)
@@ -316,10 +346,13 @@ def refresh_city_data(city) -> dict:
     if not history_daily_df.empty:
         write_city_dataframe(history_daily_df, "history_daily", city.slug)
 
+    total_city_history_df = repository.get_history_monthly(city.slug)
+    total_city_history_daily_df = repository.get_history_daily(city.slug)
     aqi_rows = int(forecast_df["aqi"].notna().sum()) if not forecast_df.empty and "aqi" in forecast_df else 0
     status = "success" if not errors else "partial"
     message = (
-        f"{city.name} 未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条，历史日样本 {len(history_daily_df)} 条。"
+        f"{city.name} 未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(total_city_history_df)} 条，历史日样本 {len(total_city_history_daily_df)} 条。"
+        + (" 历史数据已复用本地缓存。" if history_reused else "")
         + ("; " + " | ".join(errors) if errors else "")
     )
     log_refresh(crawl_time, status, message)
@@ -328,8 +361,8 @@ def refresh_city_data(city) -> dict:
         "crawl_time": crawl_time,
         "forecast_rows": len(forecast_df),
         "aqi_rows": aqi_rows,
-        "history_rows": len(history_df),
-        "history_daily_rows": len(history_daily_df),
+        "history_rows": len(total_city_history_df),
+        "history_daily_rows": len(total_city_history_daily_df),
         "errors": errors,
         "message": message,
     }
