@@ -189,7 +189,8 @@ class WeatherKnnForecastModel:
         api_avg_temp = _safe_float(row.get("avg_temp"), historical_avg_temp)
         api_baseline_temp = _safe_float(context.get("api_avg_temp_mean"), api_avg_temp)
         api_temp_delta = api_avg_temp - api_baseline_temp
-        avg_temp = historical_avg_temp + api_temp_delta * 0.55
+        historical_bias = max(-2.0, min(2.0, historical_avg_temp - api_baseline_temp))
+        avg_temp = api_avg_temp + historical_bias * 0.25
         api_precipitation = _safe_float(row.get("precipitation_mm"))
         api_rain_signal = min(1.0, api_precipitation / 8.0)
         api_rain_flag = _safe_float(row.get("rain_flag"))

@@ -203,6 +203,30 @@ class SearchAndModelTest(unittest.TestCase):
 
         self.assertLess(cool_day["avg_temp"], warm_day["avg_temp"])
 
+    def test_weather_knn_keeps_short_term_temperature_close_to_api(self) -> None:
+        import pandas as pd
+
+        history_df = pd.DataFrame(
+            [
+                {
+                    "city_slug": "nanjing",
+                    "city_name": "南京",
+                    "month_num": 5,
+                    "avg_temp": 21.5,
+                    "rainy_ratio": 0.35,
+                    "temp_std": 3,
+                    "avg_wind_speed_kmh": 16,
+                }
+            ]
+        )
+        model = WeatherKnnForecastModel(history_df, neighbors=1)
+        prediction = model.predict(
+            {"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-30", "avg_temp": 26.0},
+            series_context={"api_avg_temp_mean": 25.5},
+        )
+
+        self.assertGreaterEqual(prediction["avg_temp"], 25.0)
+
 
 class RefreshProgressTest(unittest.TestCase):
     def test_refresh_job_store_streams_until_done(self) -> None:
