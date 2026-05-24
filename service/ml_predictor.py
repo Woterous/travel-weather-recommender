@@ -136,42 +136,153 @@ def _weather_from_rain_probability(probability: float) -> tuple[str, str, float,
 
 
 class WeatherKnnForecastModel:
-    def __init__(self, history_df: pd.DataFrame, neighbors: int = 5) -> None:
+    def __init__(
+        self,
+        history_df: pd.DataFrame,
+        history_monthly_df: pd.DataFrame | None = None,
+        neighbors: int = 9,
+    ) -> None:
         self.neighbors = neighbors
-        self.samples = self._build_samples(history_df)
+        if "date" in history_df.columns:
+            daily_df = history_df
+            monthly_df = history_monthly_df if history_monthly_df is not None else pd.DataFrame()
+        else:
+            daily_df = pd.DataFrame()
+            monthly_df = history_monthly_df if history_monthly_df is not None else history_df
+        self.daily_samples = self._build_daily_samples(daily_df)
+        self.monthly_samples = self._build_monthly_samples(monthly_df)
+        self.samples = self.daily_samples or self.monthly_samples
 
-    def _build_samples(self, history_df: pd.DataFrame) -> list[dict]:
+    def _build_daily_samples(self, history_df: pd.DataFrame) -> list[dict]:
         if history_df.empty:
             return []
         samples = []
         for row in history_df.to_dict("records"):
+            date_value = pd.to_datetime(row.get("date"), errors="coerce")
+            if pd.isna(date_value):
+                continue
+            max_temp = _safe_float(row.get("max_temp"), _safe_float(row.get("avg_temp"), 20.0))
+            min_temp = _safe_float(row.get("min_temp"), _safe_float(row.get("avg_temp"), 20.0))
+            avg_temp = _safe_float(row.get("avg_temp"), (max_temp + min_temp) / 2)
             samples.append(
                 {
                     "city_slug": row.get("city_slug"),
                     "city_name": row.get("city_name"),
-                    "month_num": int(_safe_float(row.get("month_num"), 1)),
-                    "avg_temp": _safe_float(row.get("avg_temp"), 20.0),
-                    "rainy_ratio": _safe_float(row.get("rainy_ratio"), 0.2),
-                    "temp_std": _safe_float(row.get("temp_std"), 6.0),
+                    "date": date_value,
+                    "month_num": int(_safe_float(row.get("month_num"), date_value.month)),
+                    "day_of_year": int(_safe_float(row.get("day_of_year"), date_value.dayofyear)),
+                    "avg_temp": avg_temp,
+                    "temp_half_range": max(1.5, min(9.0, (max_temp - min_temp) / 2)),
+                    "rain_flag": _safe_float(row.get("rain_flag"), 0.0),
+                    "precipitation_mm": _safe_float(row.get("precipitation_mm"), 0.0),
                     "avg_wind_speed_kmh": _safe_float(row.get("avg_wind_speed_kmh"), 12.0),
+                    "wind_speed_kmh": _safe_float(row.get("wind_speed_kmh"), 12.0),
                 }
             )
         return samples
 
-    def _distance(self, city_slug: str, month_num: int, sample: dict) -> float:
+    def _build_monthly_samples(self, history_df: pd.DataFrame) -> list[dict]:
+        if history_df.empty:
+            return []
+        samples = []
+        for row in history_df.to_dict("records"):
+            month_num = int(_safe_float(row.get("month_num"), 1))
+            samples.append(
+                {
+                    "city_slug": row.get("city_slug"),
+                    "city_name": row.get("city_name"),
+                    "month_key": row.get("month_key"),
+                    "month_num": month_num,
+                    "day_of_year": min(365, max(1, int((month_num - 1) * 30.4 + 15))),
+                    "avg_temp": _safe_float(row.get("avg_temp"), 20.0),
+                    "temp_half_range": max(2.0, min(8.0, _safe_float(row.get("temp_std"), 5.0))),
+                    "rain_flag": _safe_float(row.get("rainy_ratio"), 0.2),
+                    "precipitation_mm": _safe_float(row.get("rainy_ratio"), 0.2) * 6.0,
+                    "wind_speed_kmh": _safe_float(row.get("avg_wind_speed_kmh"), 12.0),
+                }
+            )
+        return samples
+
+    def _same_season_distance(self, city_slug: str, day_of_year: int, sample: dict) -> float:
         city_penalty = 0.0 if sample["city_slug"] == city_slug else 1.2
-        month_gap = abs(month_num - int(sample["month_num"]))
-        month_gap = min(month_gap, 12 - month_gap)
-        return city_penalty + month_gap / 6.0
+        day_gap = abs(day_of_year - int(sample["day_of_year"]))
+        day_gap = min(day_gap, 366 - day_gap)
+        return city_penalty + day_gap / 45.0
+
+    def _recent_daily_stats(self, city_slug: str) -> dict:
+        city_samples = sorted(
+            [sample for sample in self.daily_samples if sample["city_slug"] == city_slug],
+            key=lambda sample: sample["date"],
+        )
+        if len(city_samples) < 14:
+            return {}
+        recent_60 = city_samples[-60:]
+        recent_30 = city_samples[-30:]
+        recent_14 = city_samples[-14:]
+        previous_14 = city_samples[-28:-14] if len(city_samples) >= 28 else []
+
+        def avg(samples: list[dict], key: str) -> float:
+            return sum(_safe_float(sample.get(key)) for sample in samples) / len(samples)
+
+        latest_sample = city_samples[-1]
+        previous_14_avg = avg(previous_14, "avg_temp") if previous_14 else avg(recent_14, "avg_temp")
+        return {
+            "latest_date": latest_sample["date"],
+            "latest_day_of_year": int(latest_sample["day_of_year"]),
+            "recent_60_avg_temp": avg(recent_60, "avg_temp"),
+            "recent_30_avg_temp": avg(recent_30, "avg_temp"),
+            "recent_14_avg_temp": avg(recent_14, "avg_temp"),
+            "recent_temp_trend": max(-4.0, min(4.0, avg(recent_14, "avg_temp") - previous_14_avg)),
+            "recent_rain_probability": max(0.0, min(1.0, avg(recent_60, "rain_flag"))),
+            "recent_wind_speed": max(0.0, avg(recent_30, "wind_speed_kmh")),
+        }
+
+    def _recent_monthly_stats(self, city_slug: str) -> dict:
+        city_samples = [sample for sample in self.monthly_samples if sample["city_slug"] == city_slug]
+        if len(city_samples) < 2:
+            return {}
+        city_samples = sorted(city_samples, key=lambda sample: str(sample.get("month_key") or sample.get("month_num")))
+        latest = city_samples[-1]
+        previous = city_samples[-2]
+        return {
+            "latest_date": None,
+            "latest_day_of_year": int(latest["day_of_year"]),
+            "recent_60_avg_temp": (latest["avg_temp"] + previous["avg_temp"]) / 2,
+            "recent_30_avg_temp": latest["avg_temp"],
+            "recent_14_avg_temp": latest["avg_temp"],
+            "recent_temp_trend": max(-4.0, min(4.0, latest["avg_temp"] - previous["avg_temp"])),
+            "recent_rain_probability": max(0.0, min(1.0, (latest["rain_flag"] + previous["rain_flag"]) / 2)),
+            "recent_wind_speed": max(0.0, (latest["wind_speed_kmh"] + previous["wind_speed_kmh"]) / 2),
+        }
+
+    def _seasonal_average(self, city_slug: str, day_of_year: int, key: str) -> float | None:
+        samples = self.daily_samples or self.monthly_samples
+        city_samples = [sample for sample in samples if sample["city_slug"] == city_slug]
+        if not city_samples:
+            return None
+        ranked = sorted(
+            (
+                (self._same_season_distance(city_slug, day_of_year, sample), _safe_float(sample.get(key)))
+                for sample in city_samples
+            ),
+            key=lambda item: item[0],
+        )[: min(self.neighbors, len(city_samples))]
+        weights = [1 / (distance + 0.05) for distance, _value in ranked]
+        total_weight = sum(weights)
+        return sum(weight * value for weight, (_distance, value) in zip(weights, ranked)) / total_weight
 
     def predict(self, row: dict, series_context: dict | None = None) -> dict | None:
         if not self.samples:
             return None
         date_text = str(row.get("date", "2000-01-01"))
-        month_num = int(date_text.split("-")[1])
+        target_date = pd.to_datetime(date_text, errors="coerce")
+        if pd.isna(target_date):
+            return None
+        day_of_year = int(target_date.dayofyear)
         city_slug = row.get("city_slug")
+        samples = self.daily_samples or self.monthly_samples
         ranked = sorted(
-            ((self._distance(city_slug, month_num, sample), sample) for sample in self.samples),
+            ((self._same_season_distance(city_slug, day_of_year, sample), sample) for sample in samples),
             key=lambda item: item[0],
         )
         nearest = ranked[: min(self.neighbors, len(ranked))]
@@ -182,32 +293,58 @@ class WeatherKnnForecastModel:
             return sum(weight * sample[key] for weight, (_distance, sample) in zip(weights, nearest)) / total_weight
 
         historical_avg_temp = weighted_average("avg_temp")
-        historical_rainy_ratio = max(0.0, min(1.0, weighted_average("rainy_ratio")))
-        temp_std = max(1.0, weighted_average("temp_std"))
-        historical_wind_speed = max(0.0, weighted_average("avg_wind_speed_kmh"))
-        context = series_context or {}
-        api_avg_temp = _safe_float(row.get("avg_temp"), historical_avg_temp)
-        api_baseline_temp = _safe_float(context.get("api_avg_temp_mean"), api_avg_temp)
-        api_temp_delta = api_avg_temp - api_baseline_temp
-        historical_bias = max(-2.0, min(2.0, historical_avg_temp - api_baseline_temp))
-        avg_temp = api_avg_temp + historical_bias * 0.25
-        api_precipitation = _safe_float(row.get("precipitation_mm"))
-        api_rain_signal = min(1.0, api_precipitation / 8.0)
-        api_rain_flag = _safe_float(row.get("rain_flag"))
-        rainy_ratio = max(0.0, min(1.0, historical_rainy_ratio * 0.65 + max(api_rain_signal, api_rain_flag) * 0.35))
-        api_wind_speed = _safe_float(row.get("wind_speed_kmh"), historical_wind_speed)
-        wind_speed = max(0.0, historical_wind_speed * 0.6 + api_wind_speed * 0.4)
+        historical_rainy_ratio = max(0.0, min(1.0, weighted_average("rain_flag")))
+        temp_half_range = max(1.0, weighted_average("temp_half_range"))
+        historical_wind_speed = max(0.0, weighted_average("wind_speed_kmh"))
+
+        recent = self._recent_daily_stats(city_slug) or self._recent_monthly_stats(city_slug)
+        if recent:
+            seasonal_recent = self._seasonal_average(
+                city_slug,
+                int(recent["latest_day_of_year"]),
+                "avg_temp",
+            )
+            seasonal_delta = historical_avg_temp - (seasonal_recent if seasonal_recent is not None else historical_avg_temp)
+            horizon_days = 14
+            if recent.get("latest_date") is not None:
+                horizon_days = max(1, int((target_date - recent["latest_date"]).days))
+            trend_factor = min(1.0, horizon_days / 14.0)
+            recent_projection = (
+                _safe_float(recent.get("recent_30_avg_temp"), historical_avg_temp)
+                + seasonal_delta
+                + _safe_float(recent.get("recent_temp_trend"), 0.0) * trend_factor * 0.45
+            )
+            horizon_decay = max(0.15, min(0.45, 0.45 - max(0, horizon_days - 7) / 120.0))
+            avg_temp = historical_avg_temp * (1 - horizon_decay) + recent_projection * horizon_decay
+            rainy_ratio = max(
+                0.0,
+                min(
+                    1.0,
+                    historical_rainy_ratio * 0.68
+                    + _safe_float(recent.get("recent_rain_probability"), historical_rainy_ratio) * 0.32,
+                ),
+            )
+            wind_speed = max(
+                0.0,
+                historical_wind_speed * 0.72
+                + _safe_float(recent.get("recent_wind_speed"), historical_wind_speed) * 0.28,
+            )
+        else:
+            avg_temp = historical_avg_temp
+            rainy_ratio = historical_rainy_ratio
+            wind_speed = historical_wind_speed
+
         weather_type, weather_detail, precipitation, rain_flag = _weather_from_rain_probability(rainy_ratio)
         avg_distance = sum(distance for distance, _sample in nearest) / len(nearest)
-        context_penalty = min(abs(api_temp_delta) / 20.0, 0.2)
-        confidence = max(0.35, min(0.95, 1 - avg_distance / 2.0 - context_penalty))
+        recent_bonus = 0.08 if recent else 0.0
+        confidence = max(0.35, min(0.88, 1 - avg_distance / 2.4 + recent_bonus))
 
         return {
             "city_slug": row.get("city_slug"),
             "city_name": row.get("city_name"),
             "date": row.get("date"),
-            "max_temp": round(avg_temp + min(temp_std, 7.0), 1),
-            "min_temp": round(avg_temp - min(temp_std, 7.0), 1),
+            "max_temp": round(avg_temp + min(temp_half_range, 8.0), 1),
+            "min_temp": round(avg_temp - min(temp_half_range, 8.0), 1),
             "avg_temp": round(avg_temp, 1),
             "weather_type": weather_type,
             "weather_detail": weather_detail,
@@ -219,18 +356,19 @@ class WeatherKnnForecastModel:
             "rain_probability": round(rainy_ratio, 2),
             "aqi": row.get("aqi"),
             "source_type": "ml_weather_forecast",
-            "source_name": "history KNN weather forecast + API trend calibration",
+            "source_name": "history daily KNN forecast + recent 60-day trend",
             "confidence": round(confidence, 2),
         }
 
 
-def build_model_summary(history_df: pd.DataFrame) -> dict:
+def build_model_summary(history_df: pd.DataFrame, history_daily_df: pd.DataFrame | None = None) -> dict:
     suitability_model = TravelSuitabilityKnnModel(history_df)
     mae = suitability_model.evaluate_mae()
-    weather_model = WeatherKnnForecastModel(history_df)
+    daily_df = history_daily_df if history_daily_df is not None else pd.DataFrame()
+    weather_model = WeatherKnnForecastModel(daily_df, history_monthly_df=history_df)
     return {
-        "name": "KNN 历史天气预测模型",
+        "name": "历史日天气 KNN 预测模型",
         "sample_count": len(weather_model.samples),
         "mae": mae,
-        "features": ["city_slug", "month_num", "avg_temp", "rainy_ratio", "avg_wind_speed_kmh"],
+        "features": ["city_slug", "day_of_year", "recent_60_days", "avg_temp", "rain_probability", "wind_speed"],
     }

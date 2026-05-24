@@ -45,7 +45,7 @@
         <ul class="tag-list">
             <li>{{ "无 AQI 模式" if not aqi_available else "AQI 已启用" }}</li>
             <li>API规则分 {{ selected.rule_score }}</li>
-            <li>预测天气评分 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
+            <li>历史ML预测评分 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
             <li>模型置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
             <li>最近刷新 {{ latest_refresh.refresh_time }}</li>
         </ul>
@@ -55,7 +55,7 @@
 {% if selected.ml_weather %}
 <section class="content-grid">
     <div class="card">
-        <div class="section-head"><h2>机器学习预测天气</h2><span>{{ selected.date }}</span></div>
+        <div class="section-head"><h2>历史机器学习预测天气</h2><span>{{ selected.date }}</span></div>
         <ul class="meta-list">
             <li><span>预测天气</span><strong>{{ selected.ml_weather.weather_detail }}</strong></li>
             <li><span>预测最高温</span><strong>{{ selected.ml_weather.max_temp }}℃</strong></li>
@@ -70,12 +70,12 @@
     <div class="card">
         <div class="section-head"><h2>计算路径</h2><span>先预测天气，再评分</span></div>
         <p>
-            模型从历史月度统计中寻找同城市、同月份的相似样本，预测未来日期的温度、降雨概率和风力。
-            然后把这些预测天气字段代入论文权重评分函数，得到当前展示的推荐分。
+            模型使用历史日天气训练，按城市和年内日期寻找相似样本，并结合最近 60 天温度、降雨、风速趋势预测未来天气。
+            预测过程不再读取未来预报温度，API 预报只作为对照曲线和基础天气展示。
         </p>
         <ul class="tag-list">
             <li>API天气规则分 {{ selected.rule_score }}</li>
-            <li>ML预测天气评分 {{ selected.ml_score }}</li>
+            <li>历史ML预测天气评分 {{ selected.ml_score }}</li>
             <li>置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
         </ul>
     </div>
@@ -83,7 +83,7 @@
 
 <section class="content-grid">
     <div class="card chart-card">
-        <div class="section-head"><h2>预测温度对比</h2><span>近 7 天</span></div>
+        <div class="section-head"><h2>预测温度对比</h2><span>未来 7 天</span></div>
         <div id="ml-temp-chart" class="chart"></div>
     </div>
     <div class="card chart-card">
@@ -146,17 +146,17 @@ window.renderLineChart("ml-temp-chart", {
     labels: {{ ml_weather_chart["dates"] | tojson }},
     series: [
         { name: "API预报均温", values: {{ ml_weather_chart["api_temps"] | tojson }} },
-        { name: "ML预测均温", values: {{ ml_weather_chart["ml_temps"] | tojson }} }
+        { name: "历史ML预测均温", values: {{ ml_weather_chart["ml_temps"] | tojson }} }
     ],
-    title: "API预报与机器学习预测温度"
+    title: "API预报与历史ML预测温度"
 });
 window.renderLineChart("ml-weather-chart", {
     labels: {{ ml_weather_chart["dates"] | tojson }},
     series: [
         { name: "API天气评分", values: {{ ml_weather_chart["api_scores"] | tojson }} },
-        { name: "ML预测天气评分", values: {{ ml_weather_chart["ml_scores"] | tojson }} }
+        { name: "历史ML预测天气评分", values: {{ ml_weather_chart["ml_scores"] | tojson }} }
     ],
-    title: "API预报评分与机器学习预测评分"
+    title: "API预报评分与历史ML预测评分"
 });
 window.renderLineChart("history-chart", {
     labels: {{ history_chart["months"] | tojson }},
