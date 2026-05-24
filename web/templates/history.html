@@ -38,7 +38,7 @@
 
 <section class="content-grid">
     <div class="card chart-card">
-        <div class="section-head"><h2>城市历史趋势</h2><span>本地月度统计</span></div>
+        <div class="section-head"><h2>城市历史趋势</h2><span>默认近12个月，可左右拖动</span></div>
         <div id="history-main-chart" class="chart"></div>
     </div>
     <div class="card">
@@ -90,7 +90,8 @@ window.renderLineChart("history-main-chart", {
         { name: "雨天频率(%)", values: {{ chart_data.rainy_ratio | tojson }} },
         { name: "舒适温度占比(%)", values: {{ chart_data.comfortable_ratio | tojson }} }
     ],
-    title: "历史月度指标"
+    title: "历史月度指标",
+    visibleWindow: 12
 });
 </script>
 {% endblock %}

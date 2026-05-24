@@ -83,6 +83,30 @@ window.renderLineChart = function renderLineChart(elementId, payload) {
         itemStyle: { color: index === 0 ? "#165a72" : index === 1 ? "#d98c3f" : "#5b7f3a" },
         areaStyle: index === 0 ? { color: "rgba(22,90,114,0.08)" } : undefined
     }));
+    if (payload.visibleWindow && payload.labels.length > payload.visibleWindow) {
+        const startValue = payload.labels.length - payload.visibleWindow;
+        option.grid.bottom = 72;
+        option.dataZoom = [
+            {
+                type: "slider",
+                startValue,
+                endValue: payload.labels.length - 1,
+                height: 18,
+                bottom: 18,
+                borderColor: "rgba(22,90,114,0.18)",
+                fillerColor: "rgba(22,90,114,0.12)",
+                handleStyle: { color: "#165a72" },
+                textStyle: { color: "#5c686d" }
+            },
+            {
+                type: "inside",
+                startValue,
+                endValue: payload.labels.length - 1,
+                zoomOnMouseWheel: true,
+                moveOnMouseMove: true
+            }
+        ];
+    }
     chart.setOption(option);
     window.addEventListener("resize", () => chart.resize());
 };
