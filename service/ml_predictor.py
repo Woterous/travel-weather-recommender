@@ -4,7 +4,7 @@ import math
 
 import pandas as pd
 
-from service.history_analysis import build_history_baseline_lookup, score_history_monthly_row
+from service.history_analysis import score_history_monthly_row
 
 
 FEATURE_RANGES = {
@@ -164,7 +164,7 @@ class WeatherKnnForecastModel:
         month_gap = min(month_gap, 12 - month_gap)
         return city_penalty + month_gap / 6.0
 
-    def predict(self, row: dict) -> dict | None:
+    def predict(self, row: dict, series_context: dict | None = None) -> dict | None:
         if not self.samples:
             return None
         date_text = str(row.get("date", "2000-01-01"))
@@ -181,13 +181,25 @@ class WeatherKnnForecastModel:
         def weighted_average(key: str) -> float:
             return sum(weight * sample[key] for weight, (_distance, sample) in zip(weights, nearest)) / total_weight
 
-        avg_temp = weighted_average("avg_temp")
-        rainy_ratio = max(0.0, min(1.0, weighted_average("rainy_ratio")))
+        historical_avg_temp = weighted_average("avg_temp")
+        historical_rainy_ratio = max(0.0, min(1.0, weighted_average("rainy_ratio")))
         temp_std = max(1.0, weighted_average("temp_std"))
-        wind_speed = max(0.0, weighted_average("avg_wind_speed_kmh"))
+        historical_wind_speed = max(0.0, weighted_average("avg_wind_speed_kmh"))
+        context = series_context or {}
+        api_avg_temp = _safe_float(row.get("avg_temp"), historical_avg_temp)
+        api_baseline_temp = _safe_float(context.get("api_avg_temp_mean"), api_avg_temp)
+        api_temp_delta = api_avg_temp - api_baseline_temp
+        avg_temp = historical_avg_temp + api_temp_delta * 0.55
+        api_precipitation = _safe_float(row.get("precipitation_mm"))
+        api_rain_signal = min(1.0, api_precipitation / 8.0)
+        api_rain_flag = _safe_float(row.get("rain_flag"))
+        rainy_ratio = max(0.0, min(1.0, historical_rainy_ratio * 0.65 + max(api_rain_signal, api_rain_flag) * 0.35))
+        api_wind_speed = _safe_float(row.get("wind_speed_kmh"), historical_wind_speed)
+        wind_speed = max(0.0, historical_wind_speed * 0.6 + api_wind_speed * 0.4)
         weather_type, weather_detail, precipitation, rain_flag = _weather_from_rain_probability(rainy_ratio)
         avg_distance = sum(distance for distance, _sample in nearest) / len(nearest)
-        confidence = max(0.35, min(0.95, 1 - avg_distance / 2.0))
+        context_penalty = min(abs(api_temp_delta) / 20.0, 0.2)
+        confidence = max(0.35, min(0.95, 1 - avg_distance / 2.0 - context_penalty))
 
         return {
             "city_slug": row.get("city_slug"),
@@ -206,7 +218,7 @@ class WeatherKnnForecastModel:
             "rain_probability": round(rainy_ratio, 2),
             "aqi": row.get("aqi"),
             "source_type": "ml_weather_forecast",
-            "source_name": "history KNN weather forecast",
+            "source_name": "history KNN weather forecast + API trend calibration",
             "confidence": round(confidence, 2),
         }
 

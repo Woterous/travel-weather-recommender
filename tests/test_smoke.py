@@ -174,6 +174,35 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertIn("wind_speed_kmh", prediction)
         self.assertGreater(prediction["confidence"], 0)
 
+    def test_weather_knn_uses_api_trend_context(self) -> None:
+        import pandas as pd
+
+        history_df = pd.DataFrame(
+            [
+                {
+                    "city_slug": "nanjing",
+                    "city_name": "南京",
+                    "month_num": 5,
+                    "avg_temp": 22,
+                    "rainy_ratio": 0.2,
+                    "temp_std": 3,
+                    "avg_wind_speed_kmh": 12,
+                }
+            ]
+        )
+        model = WeatherKnnForecastModel(history_df, neighbors=1)
+        context = {"api_avg_temp_mean": 25}
+        cool_day = model.predict(
+            {"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-24", "avg_temp": 23},
+            series_context=context,
+        )
+        warm_day = model.predict(
+            {"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-25", "avg_temp": 29},
+            series_context=context,
+        )
+
+        self.assertLess(cool_day["avg_temp"], warm_day["avg_temp"])
+
 
 class RefreshProgressTest(unittest.TestCase):
     def test_refresh_job_store_streams_until_done(self) -> None:

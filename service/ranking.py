@@ -22,6 +22,14 @@ def _month_from_date(date_text: str) -> int:
     return int(date_text.split("-")[1])
 
 
+def _build_series_context(forecast_df: pd.DataFrame) -> dict:
+    if forecast_df.empty or "avg_temp" not in forecast_df:
+        return {}
+    return {
+        "api_avg_temp_mean": float(pd.to_numeric(forecast_df["avg_temp"], errors="coerce").mean()),
+    }
+
+
 def build_ranked_records(
     forecast_df: pd.DataFrame,
     history_df: pd.DataFrame,
@@ -32,11 +40,12 @@ def build_ranked_records(
         return []
     baseline_lookup = build_history_baseline_lookup(history_df)
     ml_weather_model = WeatherKnnForecastModel(history_df)
+    series_context = _build_series_context(forecast_df)
     scored_rows = []
     for row in forecast_df.to_dict("records"):
         history_baseline = baseline_lookup.get((row["city_slug"], _month_from_date(row["date"])))
         score_card = score_record(row, history_baseline, preferences, aqi_available=aqi_available)
-        ml_weather = ml_weather_model.predict(row)
+        ml_weather = ml_weather_model.predict(row, series_context=series_context)
         ml_score_card = (
             score_record(ml_weather, history_baseline, preferences, aqi_available=aqi_available)
             if ml_weather
@@ -99,20 +108,21 @@ def build_city_detail_context(repository, city_slug: str, selected_date: str, pr
     aqi_available = repository.aqi_available()
     scored_series = build_ranked_records(city_forecast, history_df, preferences, aqi_available=aqi_available)
     selected_row = next((row for row in scored_series if row["date"] == selected_date), None)
+    chronological_series = sorted(scored_series, key=lambda row: row["date"])
     history_series = history_df[history_df["city_slug"] == city_slug].sort_values("month_key").to_dict("records")
     trend_chart = {
-        "dates": [row["date"] for row in scored_series],
-        "scores": [row["score_total"] for row in scored_series],
-        "temps": [row["avg_temp"] for row in scored_series],
+        "dates": [row["date"] for row in chronological_series],
+        "scores": [row["score_total"] for row in chronological_series],
+        "temps": [row["avg_temp"] for row in chronological_series],
     }
     ml_weather_chart = {
-        "dates": [row["date"] for row in scored_series],
-        "api_temps": [row["avg_temp"] for row in scored_series],
-        "ml_temps": [row.get("ml_weather", {}).get("avg_temp") for row in scored_series],
-        "ml_scores": [row.get("ml_score") for row in scored_series],
+        "dates": [row["date"] for row in chronological_series],
+        "api_temps": [row["avg_temp"] for row in chronological_series],
+        "ml_temps": [row.get("ml_weather", {}).get("avg_temp") for row in chronological_series],
+        "ml_scores": [row.get("ml_score") for row in chronological_series],
         "rain_probabilities": [
             round(float(row.get("ml_weather", {}).get("rain_probability", 0.0)) * 100, 1)
-            for row in scored_series
+            for row in chronological_series
         ],
     }
     breakdown_chart = {
