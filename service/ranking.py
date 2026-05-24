@@ -61,6 +61,12 @@ def build_ranked_records(
     return scored_rows
 
 
+def build_ml_prediction_highlights(ranking: list[dict], limit: int = 3) -> list[dict]:
+    candidates = [row for row in ranking if row.get("ml_score") is not None]
+    candidates.sort(key=lambda item: item["ml_score"], reverse=True)
+    return candidates[:limit]
+
+
 def build_homepage_context(repository, selected_date: str, preferences: dict) -> dict:
     forecast_df = repository.get_forecast_for_date(selected_date)
     history_df = repository.get_history_monthly()
@@ -73,6 +79,7 @@ def build_homepage_context(repository, selected_date: str, preferences: dict) ->
     return {
         "ranking": ranking,
         "chart_data": chart_data,
+        "ml_predictions": build_ml_prediction_highlights(ranking),
         "weights_preview": build_weights(preferences, aqi_available=aqi_available),
         "aqi_available": aqi_available,
         "model_summary": build_model_summary(history_df),

@@ -301,6 +301,102 @@ input[type="text"] {
     height: 360px;
 }
 
+.ml-prediction-panel {
+    display: grid;
+    gap: 18px;
+}
+
+.ml-prediction-panel .section-head h2 {
+    margin: 4px 0 0;
+}
+
+.ml-primary {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 18px;
+    align-items: center;
+    padding: 18px;
+    border: 1px solid rgba(22, 90, 114, 0.16);
+    border-radius: 18px;
+    background: rgba(22, 90, 114, 0.06);
+}
+
+.ml-primary h3 {
+    margin: 10px 0 6px;
+    font-size: 2rem;
+}
+
+.rank-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(217, 140, 63, 0.16);
+    color: var(--brand-strong);
+    font-weight: 700;
+}
+
+.ml-score-box {
+    min-width: 132px;
+    display: grid;
+    justify-items: center;
+    gap: 4px;
+    padding: 14px;
+    border-radius: 18px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+}
+
+.ml-score-box span,
+.ml-score-box small {
+    color: var(--muted);
+}
+
+.ml-score-box strong {
+    color: var(--brand-strong);
+    font-size: 2.4rem;
+    line-height: 1;
+}
+
+.ml-weather-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+}
+
+.ml-weather-item {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.56);
+}
+
+.weather-metrics {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 8px;
+}
+
+.weather-metrics li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px dashed var(--line);
+}
+
+.weather-metrics li:last-child {
+    border-bottom: 0;
+}
+
+.weather-metrics span {
+    color: var(--muted);
+}
+
 .city-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -560,6 +656,7 @@ input[type="text"] {
     .content-grid,
     .two-column,
     .compare-overview,
+    .ml-weather-grid,
     .search-result-grid,
     .city-grid {
         grid-template-columns: 1fr;
@@ -577,10 +674,15 @@ input[type="text"] {
     }
 
     .ranking-row,
+    .ml-primary,
     .city-card-foot,
     .form-actions {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .ml-primary {
+        grid-template-columns: 1fr;
     }
 
     .chart {

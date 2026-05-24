@@ -134,6 +134,52 @@
 </section>
 
 {% if ranking %}
+{% if ml_predictions %}
+<section class="ml-prediction-panel card">
+    <div class="section-head">
+        <div>
+            <p class="eyebrow">机器学习预测</p>
+            <h2>模型预测适宜出行城市天气</h2>
+        </div>
+        <span>{{ selected_date }}</span>
+    </div>
+    {% set primary_ml = ml_predictions[0] %}
+    <div class="ml-primary">
+        <div>
+            <span class="rank-badge">ML Top 1</span>
+            <h3>{{ primary_ml.city_name }}</h3>
+            <p>{{ primary_ml.weather_detail }} · 均温 {{ "%.1f"|format(primary_ml.avg_temp) }}℃ · {{ "有雨" if primary_ml.rain_flag else "少雨" }}</p>
+        </div>
+        <div class="ml-score-box">
+            <span>ML预测分</span>
+            <strong>{{ primary_ml.ml_score }}</strong>
+            <small>置信度 {{ "%.0f%%"|format(primary_ml.ml_confidence * 100) }}</small>
+        </div>
+    </div>
+    <div class="ml-weather-grid">
+        {% for row in ml_predictions %}
+        <article class="ml-weather-item">
+            <div class="city-card-head">
+                <h3>#{{ loop.index }} {{ row.city_name }}</h3>
+                <span>{{ row.ml_score }}</span>
+            </div>
+            <ul class="weather-metrics">
+                <li><span>天气</span><strong>{{ row.weather_detail }}</strong></li>
+                <li><span>平均温度</span><strong>{{ "%.1f"|format(row.avg_temp) }}℃</strong></li>
+                <li><span>降雨判断</span><strong>{{ "有雨" if row.rain_flag else "少雨" }}</strong></li>
+                <li><span>风力</span><strong>{{ row.wind_level if row.wind_level is not none else "-" }} 级</strong></li>
+                {% if aqi_available %}
+                <li><span>AQI</span><strong>{{ aqi_display(row.aqi) }}</strong></li>
+                {% endif %}
+                <li><span>置信度</span><strong>{{ "%.0f%%"|format(row.ml_confidence * 100) }}</strong></li>
+            </ul>
+            <p class="muted">最终分 {{ row.score_total }} = 规则分 {{ row.rule_score }} × 75% + ML预测 {{ row.ml_score }} × 25%</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 <section class="content-grid">
     <div class="card chart-card">
         <div class="section-head">
