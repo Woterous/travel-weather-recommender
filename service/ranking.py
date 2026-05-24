@@ -130,17 +130,24 @@ def build_city_detail_context(repository, city_slug: str, selected_date: str, pr
         "labels": [label_map[dimension] for dimension in selected_row["score_breakdown"].keys()] if selected_row else [],
         "values": [item["score"] for item in selected_row["score_breakdown"].values()] if selected_row else [],
     }
+    history_scores = [
+        round(
+            item["comfortable_days_ratio"] * 55
+            + (1 - item["rainy_ratio"]) * 25
+            + max(0, (1 - min(item["temp_std"], 12) / 12)) * 20,
+            1,
+        )
+        for item in history_series
+    ]
+    history_smoothed_scores = (
+        pd.Series(history_scores).rolling(window=3, min_periods=1, center=True).mean().round(1).tolist()
+        if history_scores
+        else []
+    )
     history_chart = {
         "months": [item["month_key"] for item in history_series],
-        "history_scores": [
-            round(
-                item["comfortable_days_ratio"] * 55
-                + (1 - item["rainy_ratio"]) * 25
-                + max(0, (1 - min(item["temp_std"], 12) / 12)) * 20,
-                1,
-            )
-            for item in history_series
-        ],
+        "history_scores": history_scores,
+        "history_smoothed_scores": history_smoothed_scores,
     }
     return {
         "selected": selected_row,
