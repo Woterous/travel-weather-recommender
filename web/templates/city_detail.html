@@ -113,7 +113,7 @@
         </ul>
     </div>
     <div class="card chart-card">
-        <div class="section-head"><h2>历史趋势</h2><span>月度适宜度与平滑趋势</span></div>
+        <div class="section-head"><h2>历史趋势</h2><span>近12个月适宜度与平滑趋势</span></div>
         <div id="history-chart" class="chart"></div>
     </div>
 </section>
@@ -163,7 +163,7 @@ window.renderLineChart("history-chart", {
         { name: "月度原始适宜度", values: {{ history_chart["history_scores"] | tojson }} },
         { name: "3个月滑动平均", values: {{ history_chart["history_smoothed_scores"] | tojson }} }
     ],
-    title: "历史月度适宜度趋势"
+    title: "近12个月历史适宜度趋势"
 });
 </script>
 {% endif %}

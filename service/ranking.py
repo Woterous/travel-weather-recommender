@@ -193,9 +193,9 @@ def _build_city_detail_context_cached(
         else []
     )
     history_chart = {
-        "months": [item["month_key"] for item in history_series],
-        "history_scores": history_scores,
-        "history_smoothed_scores": history_smoothed_scores,
+        "months": [item["month_key"] for item in history_series[-12:]],
+        "history_scores": history_scores[-12:],
+        "history_smoothed_scores": history_smoothed_scores[-12:],
     }
     return {
         "selected": selected_row,
