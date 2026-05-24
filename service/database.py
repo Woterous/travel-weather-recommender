@@ -69,6 +69,28 @@ def ensure_database() -> None:
         )
         cursor.execute(
             """
+            CREATE TABLE IF NOT EXISTS history_daily (
+                city_slug TEXT NOT NULL,
+                city_name TEXT NOT NULL,
+                date TEXT NOT NULL,
+                max_temp REAL,
+                min_temp REAL,
+                avg_temp REAL,
+                weather_detail TEXT,
+                precipitation_mm REAL,
+                rain_flag INTEGER,
+                wind_speed_kmh REAL,
+                month_num INTEGER,
+                day_of_year INTEGER,
+                source_type TEXT,
+                source_name TEXT,
+                crawl_time TEXT,
+                PRIMARY KEY (city_slug, date)
+            )
+            """
+        )
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS refresh_log (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 refresh_time TEXT NOT NULL,
@@ -182,6 +204,14 @@ class WeatherRepository:
                 (city_slug,),
             )
         return self._read_df("SELECT * FROM history_monthly ORDER BY city_slug, month_key")
+
+    def get_history_daily(self, city_slug: str | None = None) -> pd.DataFrame:
+        if city_slug:
+            return self._read_df(
+                "SELECT * FROM history_daily WHERE city_slug = ? ORDER BY date",
+                (city_slug,),
+            )
+        return self._read_df("SELECT * FROM history_daily ORDER BY city_slug, date")
 
     def get_latest_refresh_info(self) -> dict:
         df = self._read_df(

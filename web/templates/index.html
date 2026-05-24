@@ -76,7 +76,8 @@
         <ul class="weight-list">
             <li><span>模型</span><strong>{{ model_summary.name }}</strong></li>
             <li><span>训练样本</span><strong>{{ model_summary.sample_count }}</strong></li>
-            <li><span>预测目标</span><strong>温度 / 降雨 / 风力</strong></li>
+            <li><span>训练来源</span><strong>历史日天气 + 近60天趋势</strong></li>
+            <li><span>预测目标</span><strong>温度 / 降雨概率 / 风力</strong></li>
         </ul>
     </div>
 </section>
@@ -139,7 +140,7 @@
     <div class="section-head">
         <div>
             <p class="eyebrow">机器学习预测</p>
-            <h2>模型预测适宜出行城市天气</h2>
+            <h2>历史数据驱动的出行天气预测</h2>
         </div>
         <span>{{ selected_date }}</span>
     </div>
@@ -177,7 +178,7 @@
                 {% endif %}
                 <li><span>置信度</span><strong>{{ "%.0f%%"|format(row.ml_confidence * 100) }}</strong></li>
             </ul>
-            <p class="muted">推荐分 {{ row.score_total }} 由机器学习预测天气重新代入论文权重计算；API 实时规则分 {{ row.rule_score }} 用作对照。</p>
+            <p class="muted">推荐分 {{ row.score_total }} 由历史 ML 预测天气重新代入论文权重计算；API 预报规则分 {{ row.rule_score }} 仅作对照。</p>
         </article>
         {% endfor %}
     </div>

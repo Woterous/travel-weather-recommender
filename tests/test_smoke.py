@@ -11,7 +11,7 @@ if str(ROOT_DIR) not in sys.path:
 from app import app
 from config.cities import CityConfig
 from service.city_search import city_from_search_payload
-from service.clean_data import build_forecast_dataset
+from service.clean_data import build_forecast_dataset, build_history_daily_dataset
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
 from service import pipeline
 from service.refresh_progress import RefreshJobStore
@@ -174,7 +174,7 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertIn("wind_speed_kmh", prediction)
         self.assertGreater(prediction["confidence"], 0)
 
-    def test_weather_knn_uses_api_trend_context(self) -> None:
+    def test_weather_knn_ignores_forecast_temperature_input(self) -> None:
         import pandas as pd
 
         history_df = pd.DataFrame(
@@ -191,41 +191,62 @@ class SearchAndModelTest(unittest.TestCase):
             ]
         )
         model = WeatherKnnForecastModel(history_df, neighbors=1)
-        context = {"api_avg_temp_mean": 25}
-        cool_day = model.predict(
-            {"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-24", "avg_temp": 23},
-            series_context=context,
-        )
-        warm_day = model.predict(
-            {"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-25", "avg_temp": 29},
-            series_context=context,
-        )
+        cool_day = model.predict({"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-24", "avg_temp": 10})
+        warm_day = model.predict({"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-24", "avg_temp": 35})
 
-        self.assertLess(cool_day["avg_temp"], warm_day["avg_temp"])
+        self.assertEqual(cool_day["avg_temp"], warm_day["avg_temp"])
 
-    def test_weather_knn_keeps_short_term_temperature_close_to_api(self) -> None:
+    def test_weather_knn_uses_recent_daily_trend(self) -> None:
         import pandas as pd
 
-        history_df = pd.DataFrame(
+        dates = pd.date_range("2026-02-15", periods=75)
+        daily_df = pd.DataFrame(
             [
                 {
                     "city_slug": "nanjing",
                     "city_name": "南京",
-                    "month_num": 5,
-                    "avg_temp": 21.5,
-                    "rainy_ratio": 0.35,
-                    "temp_std": 3,
-                    "avg_wind_speed_kmh": 16,
+                    "date": day.strftime("%Y-%m-%d"),
+                    "month_num": day.month,
+                    "day_of_year": day.dayofyear,
+                    "max_temp": 18 + index * 0.12 + 5,
+                    "min_temp": 18 + index * 0.12 - 5,
+                    "avg_temp": 18 + index * 0.12,
+                    "rain_flag": 1 if index % 8 == 0 else 0,
+                    "precipitation_mm": 1.0 if index % 8 == 0 else 0.0,
+                    "wind_speed_kmh": 12,
                 }
+                for index, day in enumerate(dates)
             ]
         )
-        model = WeatherKnnForecastModel(history_df, neighbors=1)
-        prediction = model.predict(
-            {"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-30", "avg_temp": 26.0},
-            series_context={"api_avg_temp_mean": 25.5},
-        )
+        model = WeatherKnnForecastModel(daily_df, neighbors=5)
+        prediction = model.predict({"city_slug": "nanjing", "city_name": "南京", "date": "2026-05-10"})
 
-        self.assertGreaterEqual(prediction["avg_temp"], 25.0)
+        self.assertGreater(prediction["avg_temp"], 23.0)
+
+    def test_history_daily_dataset_keeps_daily_training_rows(self) -> None:
+        payloads = {
+            "beijing": {
+                "records": [
+                    {
+                        "city_slug": "beijing",
+                        "city_name": "北京",
+                        "date": "2026-05-01",
+                        "max_temp": 27,
+                        "min_temp": 17,
+                        "avg_temp": 22,
+                        "weather_detail": "晴",
+                        "precipitation_mm": 0,
+                        "wind_speed_kmh": 10,
+                    }
+                ]
+            }
+        }
+
+        df = build_history_daily_dataset(payloads, "2026-05-24T16:00:00")
+
+        self.assertEqual(len(df), 1)
+        self.assertEqual(int(df.iloc[0]["month_num"]), 5)
+        self.assertEqual(int(df.iloc[0]["rain_flag"]), 0)
 
 
 class RefreshProgressTest(unittest.TestCase):

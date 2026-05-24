@@ -22,30 +22,25 @@ def _month_from_date(date_text: str) -> int:
     return int(date_text.split("-")[1])
 
 
-def _build_series_context(forecast_df: pd.DataFrame) -> dict:
-    if forecast_df.empty or "avg_temp" not in forecast_df:
-        return {}
-    return {
-        "api_avg_temp_mean": float(pd.to_numeric(forecast_df["avg_temp"], errors="coerce").mean()),
-    }
-
-
 def build_ranked_records(
     forecast_df: pd.DataFrame,
     history_df: pd.DataFrame,
     preferences: dict,
     aqi_available: bool,
+    history_daily_df: pd.DataFrame | None = None,
 ) -> list[dict]:
     if forecast_df.empty:
         return []
     baseline_lookup = build_history_baseline_lookup(history_df)
-    ml_weather_model = WeatherKnnForecastModel(history_df)
-    series_context = _build_series_context(forecast_df)
+    ml_weather_model = WeatherKnnForecastModel(
+        history_daily_df if history_daily_df is not None else pd.DataFrame(),
+        history_monthly_df=history_df,
+    )
     scored_rows = []
     for row in forecast_df.to_dict("records"):
         history_baseline = baseline_lookup.get((row["city_slug"], _month_from_date(row["date"])))
         score_card = score_record(row, history_baseline, preferences, aqi_available=aqi_available)
-        ml_weather = ml_weather_model.predict(row, series_context=series_context)
+        ml_weather = ml_weather_model.predict(row)
         ml_score_card = (
             score_record(ml_weather, history_baseline, preferences, aqi_available=aqi_available)
             if ml_weather
@@ -86,8 +81,15 @@ def build_ml_prediction_highlights(ranking: list[dict], limit: int = 3) -> list[
 def build_homepage_context(repository, selected_date: str, preferences: dict) -> dict:
     forecast_df = repository.get_forecast_for_date(selected_date)
     history_df = repository.get_history_monthly()
+    history_daily_df = repository.get_history_daily()
     aqi_available = repository.aqi_available()
-    ranking = build_ranked_records(forecast_df, history_df, preferences, aqi_available=aqi_available)
+    ranking = build_ranked_records(
+        forecast_df,
+        history_df,
+        preferences,
+        aqi_available=aqi_available,
+        history_daily_df=history_daily_df,
+    )
     chart_data = {
         "cities": [row["city_name"] for row in ranking],
         "scores": [row["score_total"] for row in ranking],
@@ -98,15 +100,22 @@ def build_homepage_context(repository, selected_date: str, preferences: dict) ->
         "ml_predictions": build_ml_prediction_highlights(ranking),
         "weights_preview": build_weights(preferences, aqi_available=aqi_available),
         "aqi_available": aqi_available,
-        "model_summary": build_model_summary(history_df),
+        "model_summary": build_model_summary(history_df, history_daily_df),
     }
 
 
 def build_city_detail_context(repository, city_slug: str, selected_date: str, preferences: dict) -> dict:
     city_forecast = repository.get_city_forecast(city_slug)
     history_df = repository.get_history_monthly()
+    history_daily_df = repository.get_history_daily()
     aqi_available = repository.aqi_available()
-    scored_series = build_ranked_records(city_forecast, history_df, preferences, aqi_available=aqi_available)
+    scored_series = build_ranked_records(
+        city_forecast,
+        history_df,
+        preferences,
+        aqi_available=aqi_available,
+        history_daily_df=history_daily_df,
+    )
     selected_row = next((row for row in scored_series if row["date"] == selected_date), None)
     chronological_series = sorted(scored_series, key=lambda row: row["date"])
     history_series = history_df[history_df["city_slug"] == city_slug].sort_values("month_key").to_dict("records")
@@ -158,5 +167,5 @@ def build_city_detail_context(repository, city_slug: str, selected_date: str, pr
         "ml_weather_chart": ml_weather_chart,
         "history_chart": history_chart,
         "aqi_available": aqi_available,
-        "model_summary": build_model_summary(history_df),
+        "model_summary": build_model_summary(history_df, history_daily_df),
     }

@@ -9,7 +9,12 @@ from crawler.fetcher import HttpClient
 from crawler.forecast_crawler import fetch_forecast_api, fetch_forecast_page
 from crawler.history_crawler import fetch_history_daily
 from crawler.parser_utils import to_iso_timestamp
-from service.clean_data import build_forecast_dataset, build_history_monthly_dataset, save_processed_artifacts ##引用import数据清洗函数
+from service.clean_data import (
+    build_forecast_dataset,
+    build_history_daily_dataset,
+    build_history_monthly_dataset,
+    save_processed_artifacts,
+) ##引用import数据清洗函数
 from service.database import log_refresh, write_city_dataframe, write_dataframe
 
 
@@ -186,6 +191,7 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     )
     forecast_df = build_forecast_dataset(page_payloads, api_payloads, crawl_time, air_quality_payloads)   ##把抓到的未来天气原始数据整理成表
     history_df = build_history_monthly_dataset(history_payloads, crawl_time)    ##把抓到的历史日数据整理成“历史月度统计表”
+    history_daily_df = build_history_daily_dataset(history_payloads, crawl_time)
 
     step += 1
     _emit_progress(
@@ -194,10 +200,10 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
         step=step,
         total=total_steps,
         stage="生成 CSV",
-        message="正在保存 forecast_daily.csv 和 history_monthly.csv。",
+        message="正在保存 forecast_daily.csv、history_monthly.csv 和 history_daily.csv。",
         next_step="下一步：写入 SQLite 数据库。",
     )
-    save_processed_artifacts(forecast_df, history_df)   ##把整理后的结果保存成 CSV 文件
+    save_processed_artifacts(forecast_df, history_df, history_daily_df)   ##把整理后的结果保存成 CSV 文件
 
     step += 1
     _emit_progress(
@@ -213,11 +219,15 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
         write_dataframe(forecast_df, "forecast_daily", replace=True)
     if not history_df.empty:
         write_dataframe(history_df, "history_monthly", replace=True)
+    if not history_daily_df.empty:
+        write_dataframe(history_daily_df, "history_daily", replace=True)
 
     step += 1
     aqi_rows = int(forecast_df["aqi"].notna().sum()) if not forecast_df.empty and "aqi" in forecast_df else 0
     status = "success" if not errors else "partial"
-    message_parts = [f"未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条。"]
+    message_parts = [
+        f"未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条，历史日样本 {len(history_daily_df)} 条。"
+    ]
     if warnings:
         message_parts.append("网页天气源部分不可用，已使用 Open-Meteo API 兜底。")
     if errors:
@@ -249,6 +259,7 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
         "forecast_rows": len(forecast_df),
         "aqi_rows": aqi_rows,
         "history_rows": len(history_df),
+        "history_daily_rows": len(history_daily_df),
         "errors": errors,
         "warnings": warnings,
         "message": message,
@@ -288,16 +299,19 @@ def refresh_city_data(city) -> dict:
 
     forecast_df = build_forecast_dataset({}, api_payloads, crawl_time, air_quality_payloads)
     history_df = build_history_monthly_dataset(history_payloads, crawl_time)
+    history_daily_df = build_history_daily_dataset(history_payloads, crawl_time)
 
     if not forecast_df.empty:
         write_city_dataframe(forecast_df, "forecast_daily", city.slug)
     if not history_df.empty:
         write_city_dataframe(history_df, "history_monthly", city.slug)
+    if not history_daily_df.empty:
+        write_city_dataframe(history_daily_df, "history_daily", city.slug)
 
     aqi_rows = int(forecast_df["aqi"].notna().sum()) if not forecast_df.empty and "aqi" in forecast_df else 0
     status = "success" if not errors else "partial"
     message = (
-        f"{city.name} 未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条。"
+        f"{city.name} 未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条，历史日样本 {len(history_daily_df)} 条。"
         + ("; " + " | ".join(errors) if errors else "")
     )
     log_refresh(crawl_time, status, message)
@@ -307,6 +321,7 @@ def refresh_city_data(city) -> dict:
         "forecast_rows": len(forecast_df),
         "aqi_rows": aqi_rows,
         "history_rows": len(history_df),
+        "history_daily_rows": len(history_daily_df),
         "errors": errors,
         "message": message,
     }

@@ -71,5 +71,5 @@ def default_history_range(today: date | None = None) -> tuple[date, date]:
     reference_today = today or date.today()
     first_day_of_current_month = reference_today.replace(day=1)
     end_date = first_day_of_current_month - timedelta(days=1)
-    start_date = date(end_date.year - 2, 1, 1)
+    start_date = date(end_date.year - 5, 1, 1)
     return start_date, end_date
