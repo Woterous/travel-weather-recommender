@@ -33,6 +33,17 @@
 
 <section class="controls-grid">
     <form method="get" action="{{ url_for('home') }}" class="card filter-form">
+        <h3>全城搜索</h3>
+        <label>城市名称</label>
+        <input type="text" name="q" value="{{ search_query }}" placeholder="输入城市名，例如 广州 / 苏州 / Tokyo">
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <input type="hidden" name="date" value="{{ selected_date }}">
+        <button type="submit" class="button button-primary">搜索城市</button>
+    </form>
+
+    <form method="get" action="{{ url_for('home') }}" class="card filter-form">
         <h3>筛选条件</h3>
         <label>日期</label>
         <select name="date">
@@ -61,7 +72,49 @@
     </div>
 
     <div class="card">
-        <h3>权重预览</h3>
+        <h3>模型状态</h3>
+        <ul class="weight-list">
+            <li><span>模型</span><strong>{{ model_summary.name }}</strong></li>
+            <li><span>训练样本</span><strong>{{ model_summary.sample_count }}</strong></li>
+            <li><span>MAE</span><strong>{{ model_summary.mae if model_summary.mae is not none else "-" }}</strong></li>
+        </ul>
+    </div>
+</section>
+
+{% if search_query %}
+<section class="card">
+    <div class="section-head">
+        <h2>搜索结果</h2>
+        <span>{{ search_query }}</span>
+    </div>
+    {% if search_error %}
+        <p class="muted">{{ search_error }}</p>
+    {% elif search_results %}
+        <div class="search-result-grid">
+            {% for result in search_results %}
+            <form method="post" action="{{ url_for('refresh_city') }}" class="search-result-item">
+                <strong>{{ result.display_name }}</strong>
+                <span>{{ result.source }}</span>
+                <input type="hidden" name="slug" value="{{ result.slug }}">
+                <input type="hidden" name="name" value="{{ result.name }}">
+                <input type="hidden" name="latitude" value="{{ result.latitude }}">
+                <input type="hidden" name="longitude" value="{{ result.longitude }}">
+                {% for key, value in preferences.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <button type="submit" class="button">刷新并查看</button>
+            </form>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="muted">没有找到匹配城市。</p>
+    {% endif %}
+</section>
+{% endif %}
+
+<section class="controls-grid">
+    <div class="card">
+        <h3>论文权重预览</h3>
         <ul class="weight-list">
             {% for key, value in weights_preview.items() %}
                 <li>
@@ -124,6 +177,7 @@
             {{ "有雨" if row.rain_flag else "少雨" }}
             {% if aqi_available %} · AQI {{ aqi_display(row.aqi) }}{% endif %}
         </p>
+        <p class="muted">规则分 {{ row.rule_score }} · ML预测 {{ row.ml_score if row.ml_score is not none else "-" }} · 置信度 {{ "%.0f%%"|format(row.ml_confidence * 100) }}</p>
         <div class="city-card-foot">
             <strong class="score-big">{{ row.score_total }}</strong>
             <div class="card-actions">

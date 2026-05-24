@@ -44,6 +44,9 @@
         <p>{{ selected.reason }}</p>
         <ul class="tag-list">
             <li>{{ "无 AQI 模式" if not aqi_available else "AQI 已启用" }}</li>
+            <li>规则分 {{ selected.rule_score }}</li>
+            <li>ML预测 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
+            <li>模型置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
             <li>最近刷新 {{ latest_refresh.refresh_time }}</li>
         </ul>
     </div>

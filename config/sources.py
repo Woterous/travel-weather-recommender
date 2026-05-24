@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from config.cities import CityConfig
 
@@ -40,6 +41,18 @@ def build_air_quality_api_url(city: CityConfig) -> str:
         "&forecast_days=5"
         "&timezone=Asia%2FShanghai"
     )
+
+
+def build_geocoding_api_url(query: str, count: int = 8) -> str:
+    params = urlencode(
+        {
+            "name": query,
+            "count": count,
+            "language": "zh",
+            "format": "json",
+        }
+    )
+    return f"https://geocoding-api.open-meteo.com/v1/search?{params}"
 
 
 def build_history_api_url(city: CityConfig, start_date: date, end_date: date) -> str:

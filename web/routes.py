@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from urllib.parse import urlencode
 import math
+from types import SimpleNamespace
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
 
 from config.cities import CITIES, CITY_BY_SLUG, DEFAULT_CITY_SLUG
 from config.preferences import DEFAULT_PREFERENCES, PREFERENCE_OPTIONS, normalize_preferences, preference_label
+from service.ai_assistant import answer_assistant_message
+from service.city_search import city_from_search_payload, search_cities
 from service.compare import build_compare_context
 from service.database import WeatherRepository
 from service.history_analysis import get_city_history_series, get_history_ranking, month_num_options
-from service.pipeline import refresh_all_data
+from service.pipeline import refresh_all_data, refresh_city_data
 from service.ranking import build_city_detail_context, build_homepage_context
 from service.scoring import build_weights
 
@@ -51,6 +54,21 @@ def _aqi_display(value) -> str:
     return f"{numeric:.0f}"
 
 
+def _city_for_detail(repository: WeatherRepository, city_slug: str):
+    if city_slug in CITY_BY_SLUG:
+        return CITY_BY_SLUG[city_slug]
+    city_meta = repository.get_city_meta(city_slug)
+    if not city_meta:
+        return None
+    return SimpleNamespace(
+        slug=city_meta["slug"],
+        name=city_meta["name"],
+        pinyin=city_meta["pinyin"],
+        latitude=None,
+        longitude=None,
+    )
+
+
 def register_routes(app: Flask) -> None:
     @app.context_processor
     def inject_globals():
@@ -71,6 +89,14 @@ def register_routes(app: Flask) -> None:
         dates = repository.get_forecast_dates()
         selected_date = _resolve_selected_date(request.args.get("date"), dates)
         preferences = normalize_preferences(request.args)
+        search_query = request.args.get("q", "").strip()
+        search_results = []
+        search_error = ""
+        if search_query:
+            try:
+                search_results = search_cities(search_query)
+            except Exception as exc:
+                search_error = f"城市搜索失败：{exc}"
         context = (
             build_homepage_context(repository, selected_date, preferences)
             if selected_date
@@ -79,6 +105,7 @@ def register_routes(app: Flask) -> None:
                 "chart_data": {"cities": [], "scores": []},
                 "weights_preview": {},
                 "aqi_available": False,
+                "model_summary": {"name": "KNN 旅游适宜度回归模型", "sample_count": 0, "mae": None},
             }
         )
         return render_template(
@@ -88,6 +115,9 @@ def register_routes(app: Flask) -> None:
             preferences=preferences,
             latest_refresh=repository.get_latest_refresh_info(),
             default_compare_city="shanghai",
+            search_query=search_query,
+            search_results=search_results,
+            search_error=search_error,
             **context,
         )
 
@@ -118,10 +148,14 @@ def register_routes(app: Flask) -> None:
         preferences = normalize_preferences(request.args)
         dates = repository.get_forecast_dates()
         selected_date = _resolve_selected_date(request.args.get("date"), dates)
+        city = _city_for_detail(repository, city_slug)
+        if city is None:
+            flash("当前城市还没有本地数据，请先通过首页搜索并刷新该城市。", "warning")
+            return redirect(url_for("home") + "?" + _query_string(preferences))
         context = build_city_detail_context(repository, city_slug, selected_date, preferences) if selected_date else {}
         return render_template(
             "city_detail.html",
-            city=CITY_BY_SLUG[city_slug],
+            city=city,
             selected_date=selected_date,
             available_dates=dates,
             preferences=preferences,
@@ -138,10 +172,12 @@ def register_routes(app: Flask) -> None:
         city_a = request.args.get("city_a") or DEFAULT_CITY_SLUG
         city_b = request.args.get("city_b") or "shanghai"
         context = build_compare_context(repository, city_a, city_b, selected_date, preferences) if selected_date else {}
+        city_options = repository.get_available_cities() or [{"slug": city.slug, "name": city.name} for city in CITIES]
         return render_template(
             "compare.html",
             city_a=city_a,
             city_b=city_b,
+            city_options=city_options,
             selected_date=selected_date,
             available_dates=dates,
             preferences=preferences,
@@ -190,3 +226,25 @@ def register_routes(app: Flask) -> None:
         preferences = normalize_preferences(request.form or request.args)
         date_text = request.form.get("date") or request.args.get("date") or ""
         return redirect(url_for("home") + "?" + _query_string(preferences, {"date": date_text}))
+
+    @app.post("/city/refresh")
+    def refresh_city():
+        preferences = normalize_preferences(request.form)
+        city = city_from_search_payload(request.form)
+        result = refresh_city_data(city)
+        if result["errors"]:
+            flash(result["message"], "warning")
+        else:
+            flash(f"{city.name} 数据刷新完成。", "success")
+        return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences))
+
+    @app.post("/api/assistant")
+    def assistant_api():
+        payload = request.get_json(silent=True) or {}
+        message = str(payload.get("message", "")).strip()
+        if not message:
+            return jsonify({"answer": "请输入你想了解的问题，例如：今天推荐哪个城市？北京空气质量怎么样？", "mode": "local"})
+        repository = WeatherRepository()
+        preferences = normalize_preferences(payload.get("preferences") or {})
+        result = answer_assistant_message(message, repository, preferences)
+        return jsonify(result)

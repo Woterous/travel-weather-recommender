@@ -10,7 +10,7 @@ from crawler.forecast_crawler import fetch_forecast_api, fetch_forecast_page
 from crawler.history_crawler import fetch_history_daily
 from crawler.parser_utils import to_iso_timestamp
 from service.clean_data import build_forecast_dataset, build_history_monthly_dataset, save_processed_artifacts ##引用import数据清洗函数
-from service.database import log_refresh, write_dataframe
+from service.database import log_refresh, write_city_dataframe, write_dataframe
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -78,6 +78,63 @@ def refresh_all_data() -> dict:     ##开始刷新数据
     status = "success" if not errors else "partial"
     message = (
         f"未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条。"
+        + ("; " + " | ".join(errors) if errors else "")
+    )
+    log_refresh(crawl_time, status, message)
+    return {
+        "status": status,
+        "crawl_time": crawl_time,
+        "forecast_rows": len(forecast_df),
+        "aqi_rows": aqi_rows,
+        "history_rows": len(history_df),
+        "errors": errors,
+        "message": message,
+    }
+
+
+def refresh_city_data(city) -> dict:
+    crawl_time = to_iso_timestamp()
+    client = HttpClient()
+    api_payloads = {}
+    air_quality_payloads = {}
+    history_payloads = {}
+    errors = []
+
+    try:
+        api_payload = fetch_forecast_api(city, client=client)
+        api_payloads[city.slug] = api_payload
+        suffix = crawl_time.replace(":", "-")
+        _save_json(RAW_FORECAST_DIR / f"{city.slug}_api_{suffix}.json", api_payload)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"未来天气 API 数据失败: {city.name} -> {exc}")
+
+    try:
+        air_quality_payload = fetch_air_quality_api(city, client=client)
+        air_quality_payloads[city.slug] = air_quality_payload
+        suffix = crawl_time.replace(":", "-")
+        _save_json(RAW_AIR_QUALITY_DIR / f"{city.slug}_{suffix}.json", air_quality_payload)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"AQI 数据失败: {city.name} -> {exc}")
+
+    try:
+        history_payload = fetch_history_daily(city, client=client)
+        history_payloads[city.slug] = history_payload
+        _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
+    except Exception as exc:  # pragma: no cover
+        errors.append(f"历史数据失败: {city.name} -> {exc}")
+
+    forecast_df = build_forecast_dataset({}, api_payloads, crawl_time, air_quality_payloads)
+    history_df = build_history_monthly_dataset(history_payloads, crawl_time)
+
+    if not forecast_df.empty:
+        write_city_dataframe(forecast_df, "forecast_daily", city.slug)
+    if not history_df.empty:
+        write_city_dataframe(history_df, "history_monthly", city.slug)
+
+    aqi_rows = int(forecast_df["aqi"].notna().sum()) if not forecast_df.empty and "aqi" in forecast_df else 0
+    status = "success" if not errors else "partial"
+    message = (
+        f"{city.name} 未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条。"
         + ("; " + " | ".join(errors) if errors else "")
     )
     log_refresh(crawl_time, status, message)

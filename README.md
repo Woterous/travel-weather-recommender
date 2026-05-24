@@ -15,8 +15,11 @@
 
 - 固定 10 城市未来天气推荐
 - 免费 Open-Meteo Air Quality API 接入 AQI 空气质量
+- 免费 Open-Meteo Geocoding API 支持全城搜索
 - 历史月度统计分析
 - 参考旅游气候指数论文的规则型旅游适宜度评分
+- KNN 旅游适宜度机器学习预测
+- 全局 AI 助手接口占位，当前基于本地数据回答
 - 偏好设置
 - 首页兼排行榜
 - 城市详情
@@ -52,6 +55,13 @@ python scripts/crawl_all.py
 - 保存原始 JSON
 - 生成处理后的 CSV
 - 写入 `data/db/weather_recommender.sqlite3`
+
+## 城市搜索与 AI 助手
+
+- 首页支持城市搜索，搜索结果来自免费 Open-Meteo Geocoding API。
+- 搜索结果可单独刷新，不需要每次刷新全部城市。
+- 页面右下角提供全局 AI 助手入口，当前调用 `/api/assistant`，基于本地 SQLite 推荐结果回答问题。
+- 后续接入外部大模型时，可在 `service/ai_assistant.py` 中实现 `TRAVEL_AI_ENDPOINT` 和 `TRAVEL_AI_API_KEY` 对应调用。
 
 ## 启动项目
 

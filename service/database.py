@@ -94,6 +94,18 @@ def write_dataframe(df: pd.DataFrame, table_name: str, replace: bool = True) -> 
         connection.close()
 
 
+def write_city_dataframe(df: pd.DataFrame, table_name: str, city_slug: str) -> None:
+    ensure_database()
+    connection = get_connection()
+    try:
+        connection.execute(f"DELETE FROM {table_name} WHERE city_slug = ?", (city_slug,))
+        if not df.empty:
+            df.to_sql(table_name, connection, if_exists="append", index=False)
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def log_refresh(refresh_time: str, status: str, message: str) -> None:
     ensure_database()
     connection = get_connection()
@@ -133,6 +145,35 @@ class WeatherRepository:
             "SELECT * FROM forecast_daily WHERE city_slug = ? ORDER BY date",
             (city_slug,),
         )
+
+    def get_available_cities(self) -> list[dict]:
+        df = self._read_df(
+            """
+            SELECT city_slug, city_name, MAX(crawl_time) AS crawl_time
+            FROM forecast_daily
+            GROUP BY city_slug, city_name
+            ORDER BY city_name
+            """
+        )
+        if df.empty:
+            return []
+        return df.rename(columns={"city_slug": "slug", "city_name": "name"}).to_dict("records")
+
+    def get_city_meta(self, city_slug: str) -> dict | None:
+        df = self._read_df(
+            """
+            SELECT city_slug, city_name
+            FROM forecast_daily
+            WHERE city_slug = ?
+            ORDER BY crawl_time DESC
+            LIMIT 1
+            """,
+            (city_slug,),
+        )
+        if df.empty:
+            return None
+        row = df.iloc[0]
+        return {"slug": row["city_slug"], "name": row["city_name"], "pinyin": row["city_slug"]}
 
     def get_history_monthly(self, city_slug: str | None = None) -> pd.DataFrame:
         if city_slug:

@@ -86,3 +86,59 @@ window.renderLineChart = function renderLineChart(elementId, payload) {
     chart.setOption(option);
     window.addEventListener("resize", () => chart.resize());
 };
+
+function appendAiMessage(container, role, text) {
+    const node = document.createElement("div");
+    node.className = `ai-message ${role}`;
+    node.textContent = text;
+    container.appendChild(node);
+    container.scrollTop = container.scrollHeight;
+}
+
+function initAssistant() {
+    const panel = document.querySelector("[data-ai-panel]");
+    const toggles = document.querySelectorAll("[data-ai-toggle]");
+    const form = document.querySelector("[data-ai-form]");
+    const messages = document.querySelector("[data-ai-messages]");
+    if (!panel || !form || !messages) return;
+
+    toggles.forEach((toggle) => {
+        toggle.addEventListener("click", () => {
+            panel.classList.toggle("open");
+        });
+    });
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const input = form.elements.message;
+        const text = input.value.trim();
+        if (!text) return;
+        appendAiMessage(messages, "user", text);
+        input.value = "";
+        appendAiMessage(messages, "assistant", "正在查询本地推荐数据...");
+        const pending = messages.lastElementChild;
+        try {
+            const response = await fetch("/api/assistant", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ message: text })
+            });
+            const payload = await response.json();
+            pending.textContent = payload.answer || "没有生成有效回答。";
+        } catch (error) {
+            pending.textContent = "助手接口暂时不可用，请稍后再试。";
+        }
+    });
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("assistant") === "open") {
+        panel.classList.add("open");
+        const demoQuestion = params.get("ask");
+        if (demoQuestion) {
+            form.elements.message.value = demoQuestion;
+            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+        }
+    }
+}
+
+document.addEventListener("DOMContentLoaded", initAssistant);

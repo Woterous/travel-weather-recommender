@@ -18,13 +18,13 @@
         </select>
         <label>城市 A</label>
         <select name="city_a">
-            {% for city in cities %}
+            {% for city in city_options %}
                 <option value="{{ city.slug }}" {% if city.slug == city_a %}selected{% endif %}>{{ city.name }}</option>
             {% endfor %}
         </select>
         <label>城市 B</label>
         <select name="city_b">
-            {% for city in cities %}
+            {% for city in city_options %}
                 <option value="{{ city.slug }}" {% if city.slug == city_b %}selected{% endif %}>{{ city.name }}</option>
             {% endfor %}
         </select>
@@ -42,6 +42,7 @@
         <strong class="score-big">{{ row_a.score_total }}</strong>
         <p>{{ row_a.weather_detail }} · {{ row_a.avg_temp }}℃</p>
         {% if aqi_available %}<p>AQI {{ aqi_display(row_a.aqi) }}</p>{% endif %}
+        <p>规则 {{ row_a.rule_score }} · ML {{ row_a.ml_score if row_a.ml_score is not none else "-" }}</p>
     </div>
     <div class="card score-compare center">
         <h3>分差</h3>
@@ -53,6 +54,7 @@
         <strong class="score-big">{{ row_b.score_total }}</strong>
         <p>{{ row_b.weather_detail }} · {{ row_b.avg_temp }}℃</p>
         {% if aqi_available %}<p>AQI {{ aqi_display(row_b.aqi) }}</p>{% endif %}
+        <p>规则 {{ row_b.rule_score }} · ML {{ row_b.ml_score if row_b.ml_score is not none else "-" }}</p>
     </div>
 </section>
 

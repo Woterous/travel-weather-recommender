@@ -380,12 +380,121 @@ input[type="text"] {
     padding: 60px 24px;
 }
 
+.search-result-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 14px;
+}
+
+.search-result-item {
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.6);
+}
+
+.search-result-item span {
+    color: var(--muted);
+    font-size: 0.9rem;
+}
+
+.ai-assistant {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 20;
+}
+
+.ai-toggle {
+    width: 56px;
+    height: 56px;
+    border: 0;
+    border-radius: 18px;
+    background: var(--brand);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: var(--shadow);
+    cursor: pointer;
+}
+
+.ai-panel {
+    position: absolute;
+    right: 0;
+    bottom: 68px;
+    width: min(360px, calc(100vw - 32px));
+    display: none;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: var(--paper);
+    box-shadow: var(--shadow);
+}
+
+.ai-panel.open {
+    display: block;
+}
+
+.ai-panel-head,
+.ai-form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 12px;
+    border-bottom: 1px solid var(--line);
+}
+
+.ai-panel-head {
+    justify-content: space-between;
+}
+
+.ai-panel-head button,
+.ai-form button {
+    border: 0;
+    border-radius: 12px;
+    background: rgba(22, 90, 114, 0.1);
+    color: var(--brand-strong);
+    cursor: pointer;
+    padding: 8px 10px;
+}
+
+.ai-messages {
+    max-height: 280px;
+    overflow: auto;
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+}
+
+.ai-message {
+    padding: 10px 12px;
+    border-radius: 14px;
+    line-height: 1.5;
+    background: rgba(22, 90, 114, 0.08);
+}
+
+.ai-message.user {
+    margin-left: 36px;
+    background: rgba(217, 140, 63, 0.16);
+}
+
+.ai-form {
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+}
+
+.ai-form input {
+    min-width: 0;
+}
+
 @media (max-width: 1024px) {
     .hero-panel,
     .controls-grid,
     .content-grid,
     .two-column,
     .compare-overview,
+    .search-result-grid,
     .city-grid {
         grid-template-columns: 1fr;
     }

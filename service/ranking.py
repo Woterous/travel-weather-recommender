@@ -3,6 +3,7 @@ from __future__ import annotations
 import pandas as pd
 
 from service.history_analysis import build_history_baseline_lookup
+from service.ml_predictor import TravelSuitabilityKnnModel, build_model_summary, predict_row_score
 from service.reason_generator import generate_reason, generate_summary
 from service.scoring import build_weights, score_record
 
@@ -30,15 +31,23 @@ def build_ranked_records(
     if forecast_df.empty:
         return []
     baseline_lookup = build_history_baseline_lookup(history_df)
+    ml_model = TravelSuitabilityKnnModel(history_df)
     scored_rows = []
     for row in forecast_df.to_dict("records"):
         history_baseline = baseline_lookup.get((row["city_slug"], _month_from_date(row["date"])))
         score_card = score_record(row, history_baseline, preferences, aqi_available=aqi_available)
+        prediction = predict_row_score(row, history_baseline, ml_model)
+        rule_score = score_card["total"]
+        ml_score = prediction["ml_score"]
+        final_score = rule_score if ml_score is None else round(rule_score * 0.75 + ml_score * 0.25, 1)
         reason = generate_reason(row, score_card["breakdown"], preferences, history_baseline)
         scored_rows.append(
             {
                 **row,
-                "score_total": score_card["total"],
+                "score_total": final_score,
+                "rule_score": rule_score,
+                "ml_score": ml_score,
+                "ml_confidence": prediction["ml_confidence"],
                 "score_breakdown": score_card["breakdown"],
                 "weights": score_card["weights"],
                 "reason": reason,
@@ -66,6 +75,7 @@ def build_homepage_context(repository, selected_date: str, preferences: dict) ->
         "chart_data": chart_data,
         "weights_preview": build_weights(preferences, aqi_available=aqi_available),
         "aqi_available": aqi_available,
+        "model_summary": build_model_summary(history_df),
     }
 
 
@@ -105,4 +115,5 @@ def build_city_detail_context(repository, city_slug: str, selected_date: str, pr
         "breakdown_chart": breakdown_chart,
         "history_chart": history_chart,
         "aqi_available": aqi_available,
+        "model_summary": build_model_summary(history_df),
     }
