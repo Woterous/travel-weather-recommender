@@ -1,6 +1,7 @@
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
@@ -8,9 +9,11 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from app import app
+from config.cities import CityConfig
 from service.city_search import city_from_search_payload
 from service.clean_data import build_forecast_dataset
 from service.ml_predictor import TravelSuitabilityKnnModel
+from service import pipeline
 from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
 
@@ -148,6 +151,58 @@ class RefreshProgressTest(unittest.TestCase):
 
         self.assertEqual(events[0]["status"], "running")
         self.assertEqual(events[-1]["status"], "done")
+
+    def test_forecast_page_failure_uses_api_fallback_without_raw_error(self) -> None:
+        city = CityConfig("beijing", "北京", "beijing", 39.9042, 116.4074)
+        api_payload = {
+            "records": [
+                {
+                    "city_slug": "beijing",
+                    "city_name": "北京",
+                    "date": "2026-05-24",
+                    "max_temp_api": 28,
+                    "min_temp_api": 18,
+                    "avg_temp_api": 23,
+                    "weather_type_api": "clear",
+                    "weather_detail_api": "晴",
+                    "wind_speed_kmh": 10,
+                    "wind_level": 2,
+                    "precipitation_mm": 0,
+                }
+            ]
+        }
+        aqi_payload = {"records": [{"date": "2026-05-24", "aqi": 50}]}
+        history_payload = {
+            "records": [
+                {
+                    "city_slug": "beijing",
+                    "city_name": "北京",
+                    "date": "2026-05-01",
+                    "precipitation_mm": 0,
+                    "avg_temp": 22,
+                    "max_temp": 27,
+                    "min_temp": 17,
+                    "wind_speed_kmh": 10,
+                }
+            ]
+        }
+
+        with mock.patch.object(pipeline, "CITIES", [city]), \
+            mock.patch.object(pipeline, "to_iso_timestamp", return_value="2026-05-24T16:00:00"), \
+            mock.patch.object(pipeline, "fetch_forecast_page", side_effect=RuntimeError("HTTPSConnectionPool raw ssl failure")), \
+            mock.patch.object(pipeline, "fetch_forecast_api", return_value=api_payload), \
+            mock.patch.object(pipeline, "fetch_air_quality_api", return_value=aqi_payload), \
+            mock.patch.object(pipeline, "fetch_history_daily", return_value=history_payload), \
+            mock.patch.object(pipeline, "_save_json"), \
+            mock.patch.object(pipeline, "save_processed_artifacts"), \
+            mock.patch.object(pipeline, "write_dataframe"), \
+            mock.patch.object(pipeline, "log_refresh"):
+            result = pipeline.refresh_all_data()
+
+        self.assertEqual(result["status"], "success")
+        self.assertEqual(result["errors"], [])
+        self.assertIn("Open-Meteo API 兜底", result["message"])
+        self.assertNotIn("HTTPSConnectionPool", result["message"])
 
 
 if __name__ == "__main__":

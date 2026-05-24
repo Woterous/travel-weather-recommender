@@ -37,6 +37,7 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     air_quality_payloads = {}
     history_payloads = {}
     errors = []
+    warnings = []
     total_steps = len(CITIES) * 4 + 5
     step = 0
 
@@ -66,16 +67,21 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
             suffix = crawl_time.replace(":", "-")
             _save_json(RAW_FORECAST_DIR / f"{city.slug}_page_{suffix}.json", page_payload)
         except Exception as exc:  # pragma: no cover
-            errors.append(f"未来天气抓取失败: {city.name} -> {exc}")
+            warnings.append(f"{city.name} 网页天气源暂时不可用，已使用 Open-Meteo API 兜底。")
 
         step += 1
+        page_message = (
+            f"{city.name} 天气网页抓取完成，已保存原始 JSON。"
+            if city.slug in page_payloads
+            else f"{city.name} 网页天气源不可用，继续使用 API 兜底。"
+        )
         _emit_progress(
             progress_callback,
             status="running",
             step=step,
             total=total_steps,
             stage="未来天气网页",
-            message=f"{city.name} 天气网页抓取完成，已保存原始 JSON。",
+            message=page_message,
             next_step=f"下一步：抓取 {city.name} 的未来天气 API 补充数据。",
         )
 
@@ -211,11 +217,32 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     step += 1
     aqi_rows = int(forecast_df["aqi"].notna().sum()) if not forecast_df.empty and "aqi" in forecast_df else 0
     status = "success" if not errors else "partial"
-    message = (
-        f"未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条。"
-        + ("; " + " | ".join(errors) if errors else "")
-    )
+    message_parts = [f"未来天气 {len(forecast_df)} 条，AQI {aqi_rows} 条，历史月度统计 {len(history_df)} 条。"]
+    if warnings:
+        message_parts.append("网页天气源部分不可用，已使用 Open-Meteo API 兜底。")
+    if errors:
+        message_parts.append(" | ".join(errors))
+    message = " ".join(message_parts)
     log_refresh(crawl_time, status, message)
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=step,
+        total=total_steps,
+        stage="刷新日志",
+        message="刷新日志已记录，正在准备返回首页。",
+        next_step="下一步：页面将加载最新排行榜。",
+    )
+    step += 1
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=total_steps,
+        total=total_steps,
+        stage="刷新完成",
+        message=message,
+        next_step="刷新完成，即将重新加载页面。",
+    )
     return {
         "status": status,
         "crawl_time": crawl_time,
@@ -223,6 +250,7 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
         "aqi_rows": aqi_rows,
         "history_rows": len(history_df),
         "errors": errors,
+        "warnings": warnings,
         "message": message,
     }
 
@@ -273,25 +301,6 @@ def refresh_city_data(city) -> dict:
         + ("; " + " | ".join(errors) if errors else "")
     )
     log_refresh(crawl_time, status, message)
-    _emit_progress(
-        progress_callback,
-        status="running",
-        step=step,
-        total=total_steps,
-        stage="刷新日志",
-        message="刷新日志已记录，正在准备返回首页。",
-        next_step="下一步：页面将加载最新排行榜。",
-    )
-    step += 1
-    _emit_progress(
-        progress_callback,
-        status="running",
-        step=total_steps,
-        total=total_steps,
-        stage="刷新完成",
-        message=message,
-        next_step="刷新完成，即将重新加载页面。",
-    )
     return {
         "status": status,
         "crawl_time": crawl_time,
