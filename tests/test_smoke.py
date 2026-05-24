@@ -11,6 +11,7 @@ from app import app
 from service.city_search import city_from_search_payload
 from service.clean_data import build_forecast_dataset
 from service.ml_predictor import TravelSuitabilityKnnModel
+from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
 
 
@@ -134,6 +135,19 @@ class SearchAndModelTest(unittest.TestCase):
 
         self.assertIsNotNone(prediction["ml_score"])
         self.assertGreater(prediction["ml_confidence"], 0)
+
+
+class RefreshProgressTest(unittest.TestCase):
+    def test_refresh_job_store_streams_until_done(self) -> None:
+        store = RefreshJobStore()
+        job_id = store.create()
+        store.emit(job_id, {"status": "running", "message": "正在抓取北京天气"})
+        store.emit(job_id, {"status": "done", "message": "刷新完成"})
+
+        events = list(store.listen(job_id, timeout=0.1))
+
+        self.assertEqual(events[0]["status"], "running")
+        self.assertEqual(events[-1]["status"], "done")
 
 
 if __name__ == "__main__":

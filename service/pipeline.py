@@ -24,7 +24,12 @@ def _save_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
-def refresh_all_data() -> dict:     ##开始刷新数据
+def _emit_progress(progress_callback, **payload) -> None:
+    if progress_callback:
+        progress_callback(payload)
+
+
+def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     crawl_time = to_iso_timestamp()     ##生成一次抓取时间 crawl_time
     client = HttpClient()
     page_payloads = {}
@@ -32,8 +37,29 @@ def refresh_all_data() -> dict:     ##开始刷新数据
     air_quality_payloads = {}
     history_payloads = {}
     errors = []
+    total_steps = len(CITIES) * 4 + 5
+    step = 0
+
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=step,
+        total=total_steps,
+        stage="准备刷新",
+        message="正在初始化 HTTP 客户端和本次抓取时间。",
+        next_step=f"下一步：抓取 {CITIES[0].name} 的未来天气网页。",
+    )
 
     for city in CITIES:     ##遍历配置里的所有城市，对每个城市分别抓三类数据
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step + 1,
+            total=total_steps,
+            stage="未来天气网页",
+            message=f"正在抓取 {city.name} 的 7 日天气网页数据。",
+            next_step=f"下一步：抓取 {city.name} 的 Open-Meteo 未来天气 API。",
+        )
         try:        ##未来天气页面数据
             page_payload = fetch_forecast_page(city, client=client)
             page_payloads[city.slug] = page_payload
@@ -42,6 +68,26 @@ def refresh_all_data() -> dict:     ##开始刷新数据
         except Exception as exc:  # pragma: no cover
             errors.append(f"未来天气抓取失败: {city.name} -> {exc}")
 
+        step += 1
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step,
+            total=total_steps,
+            stage="未来天气网页",
+            message=f"{city.name} 天气网页抓取完成，已保存原始 JSON。",
+            next_step=f"下一步：抓取 {city.name} 的未来天气 API 补充数据。",
+        )
+
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step + 1,
+            total=total_steps,
+            stage="未来天气 API",
+            message=f"正在抓取 {city.name} 的温度、降水、风速等 API 数据。",
+            next_step=f"下一步：抓取 {city.name} 的 AQI 空气质量数据。",
+        )
         try:        ##未来天气 API 数据
             api_payload = fetch_forecast_api(city, client=client)
             api_payloads[city.slug] = api_payload
@@ -50,6 +96,26 @@ def refresh_all_data() -> dict:     ##开始刷新数据
         except Exception as exc:  # pragma: no cover
             errors.append(f"未来天气补充数据失败: {city.name} -> {exc}")
 
+        step += 1
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step,
+            total=total_steps,
+            stage="未来天气 API",
+            message=f"{city.name} 未来天气 API 处理完成。",
+            next_step=f"下一步：抓取 {city.name} 的 AQI 空气质量。",
+        )
+
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step + 1,
+            total=total_steps,
+            stage="AQI 空气质量",
+            message=f"正在抓取 {city.name} 的 AQI、PM2.5、PM10 等空气质量数据。",
+            next_step=f"下一步：抓取 {city.name} 的历史天气归档。",
+        )
         try:
             air_quality_payload = fetch_air_quality_api(city, client=client)
             air_quality_payloads[city.slug] = air_quality_payload
@@ -58,6 +124,26 @@ def refresh_all_data() -> dict:     ##开始刷新数据
         except Exception as exc:  # pragma: no cover
             errors.append(f"AQI 数据抓取失败: {city.name} -> {exc}")
 
+        step += 1
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step,
+            total=total_steps,
+            stage="AQI 空气质量",
+            message=f"{city.name} AQI 数据处理完成。",
+            next_step=f"下一步：抓取 {city.name} 的历史天气。",
+        )
+
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step + 1,
+            total=total_steps,
+            stage="历史天气",
+            message=f"正在抓取 {city.name} 的历史日天气，用于月度统计和机器学习预测。",
+            next_step="下一步：继续处理后续城市，或进入数据清洗。",
+        )
         try:        ##历史天气数据
             history_payload = fetch_history_daily(city, client=client)
             history_payloads[city.slug] = history_payload
@@ -65,15 +151,64 @@ def refresh_all_data() -> dict:     ##开始刷新数据
         except Exception as exc:  # pragma: no cover
             errors.append(f"历史数据抓取失败: {city.name} -> {exc}")
 
+        step += 1
+        next_city_index = CITIES.index(city) + 1
+        next_step = (
+            f"下一步：抓取 {CITIES[next_city_index].name} 的未来天气网页。"
+            if next_city_index < len(CITIES)
+            else "下一步：清洗未来天气、AQI 和历史天气数据。"
+        )
+        _emit_progress(
+            progress_callback,
+            status="running",
+            step=step,
+            total=total_steps,
+            stage="历史天气",
+            message=f"{city.name} 历史天气处理完成。",
+            next_step=next_step,
+        )
+
+    step += 1
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=step,
+        total=total_steps,
+        stage="数据清洗",
+        message="正在合并未来天气、AQI 和历史月度统计数据。",
+        next_step="下一步：生成处理后的 CSV 文件。",
+    )
     forecast_df = build_forecast_dataset(page_payloads, api_payloads, crawl_time, air_quality_payloads)   ##把抓到的未来天气原始数据整理成表
     history_df = build_history_monthly_dataset(history_payloads, crawl_time)    ##把抓到的历史日数据整理成“历史月度统计表”
+
+    step += 1
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=step,
+        total=total_steps,
+        stage="生成 CSV",
+        message="正在保存 forecast_daily.csv 和 history_monthly.csv。",
+        next_step="下一步：写入 SQLite 数据库。",
+    )
     save_processed_artifacts(forecast_df, history_df)   ##把整理后的结果保存成 CSV 文件
 
+    step += 1
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=step,
+        total=total_steps,
+        stage="写入数据库",
+        message="正在将刷新结果写入 SQLite 表。",
+        next_step="下一步：记录刷新日志并重新计算页面推荐。",
+    )
     if not forecast_df.empty:
         write_dataframe(forecast_df, "forecast_daily", replace=True)
     if not history_df.empty:
         write_dataframe(history_df, "history_monthly", replace=True)
 
+    step += 1
     aqi_rows = int(forecast_df["aqi"].notna().sum()) if not forecast_df.empty and "aqi" in forecast_df else 0
     status = "success" if not errors else "partial"
     message = (
@@ -138,6 +273,25 @@ def refresh_city_data(city) -> dict:
         + ("; " + " | ".join(errors) if errors else "")
     )
     log_refresh(crawl_time, status, message)
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=step,
+        total=total_steps,
+        stage="刷新日志",
+        message="刷新日志已记录，正在准备返回首页。",
+        next_step="下一步：页面将加载最新排行榜。",
+    )
+    step += 1
+    _emit_progress(
+        progress_callback,
+        status="running",
+        step=total_steps,
+        total=total_steps,
+        stage="刷新完成",
+        message=message,
+        next_step="刷新完成，即将重新加载页面。",
+    )
     return {
         "status": status,
         "crawl_time": crawl_time,

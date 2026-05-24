@@ -142,3 +142,112 @@ function initAssistant() {
 }
 
 document.addEventListener("DOMContentLoaded", initAssistant);
+
+function initRefreshProgress() {
+    const form = document.querySelector(".refresh-form");
+    const modal = document.querySelector("[data-refresh-modal]");
+    if (!form || !modal || typeof EventSource === "undefined") return;
+
+    const percentNode = modal.querySelector("[data-refresh-percent]");
+    const barNode = modal.querySelector("[data-refresh-bar]");
+    const stepsNode = modal.querySelector("[data-refresh-steps]");
+    const messageNode = modal.querySelector("[data-refresh-message]");
+    const nextNode = modal.querySelector("[data-refresh-next]");
+    const closeNode = modal.querySelector("[data-refresh-close]");
+    let redirectUrl = null;
+    let eventSource = null;
+
+    function openModal() {
+        modal.classList.add("open");
+        redirectUrl = null;
+        if (percentNode) percentNode.textContent = "0%";
+        if (barNode) barNode.style.width = "0%";
+        if (stepsNode) stepsNode.innerHTML = '<li class="active">正在创建刷新任务</li>';
+        if (messageNode) messageNode.textContent = "正在连接后端刷新任务。";
+        if (nextNode) nextNode.textContent = "下一步：等待服务端返回任务编号。";
+    }
+
+    function appendStep(text, state) {
+        if (!stepsNode || !text) return;
+        const current = stepsNode.querySelector("li.active");
+        if (current) {
+            current.classList.remove("active");
+            current.classList.add("done");
+        }
+        const item = document.createElement("li");
+        item.className = state || "active";
+        item.textContent = text;
+        stepsNode.appendChild(item);
+        stepsNode.scrollTop = stepsNode.scrollHeight;
+    }
+
+    function applyProgress(event) {
+        const step = Number(event.step || 0);
+        const total = Number(event.total || 1);
+        const percent = Math.max(0, Math.min(100, Math.round((step / total) * 100)));
+        if (percentNode) percentNode.textContent = `${percent}%`;
+        if (barNode) barNode.style.width = `${percent}%`;
+        if (messageNode) messageNode.textContent = event.message || "";
+        if (nextNode) nextNode.textContent = event.next_step || "";
+        if (event.stage && event.status !== "heartbeat") {
+            appendStep(`${event.stage}：${event.message || ""}`, event.status === "done" ? "done" : "active");
+        }
+        if (event.redirect_url) {
+            redirectUrl = event.redirect_url;
+        }
+        if (["done", "warning", "error"].includes(event.status)) {
+            if (eventSource) eventSource.close();
+            if (event.status !== "error" && redirectUrl) {
+                window.setTimeout(() => {
+                    window.location.href = redirectUrl;
+                }, 900);
+            }
+        }
+    }
+
+    form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        openModal();
+        try {
+            const response = await fetch("/refresh/start", {
+                method: "POST",
+                body: new FormData(form),
+                headers: { "X-Requested-With": "XMLHttpRequest" }
+            });
+            const payload = await response.json();
+            eventSource = new EventSource(`/refresh/events/${payload.job_id}`);
+            eventSource.onmessage = (messageEvent) => {
+                applyProgress(JSON.parse(messageEvent.data));
+            };
+            eventSource.onerror = () => {
+                if (messageNode) messageNode.textContent = "进度连接中断，但刷新任务可能仍在后端执行。";
+                if (nextNode) nextNode.textContent = "可稍后刷新页面查看最新数据。";
+                if (eventSource) eventSource.close();
+            };
+        } catch (error) {
+            if (messageNode) messageNode.textContent = "无法启动实时进度刷新，正在使用普通刷新方式。";
+            window.setTimeout(() => form.submit(), 800);
+        }
+    });
+
+    if (closeNode) {
+        closeNode.addEventListener("click", () => {
+            modal.classList.remove("open");
+        });
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("progress") === "demo") {
+        openModal();
+        applyProgress({
+            status: "running",
+            step: 17,
+            total: 45,
+            stage: "AQI 空气质量",
+            message: "正在抓取 成都 的 AQI、PM2.5、PM10 等空气质量数据。",
+            next_step: "下一步：抓取 成都 的历史天气归档。"
+        });
+    }
+}
+
+document.addEventListener("DOMContentLoaded", initRefreshProgress);

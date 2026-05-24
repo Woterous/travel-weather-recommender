@@ -1,10 +1,12 @@
 from __future__ import annotations
 
-from urllib.parse import urlencode
+import json
 import math
+from threading import Thread
 from types import SimpleNamespace
+from urllib.parse import urlencode
 
-from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
+from flask import Flask, Response, flash, jsonify, redirect, render_template, request, stream_with_context, url_for
 
 from config.cities import CITIES, CITY_BY_SLUG, DEFAULT_CITY_SLUG
 from config.preferences import DEFAULT_PREFERENCES, PREFERENCE_OPTIONS, normalize_preferences, preference_label
@@ -15,6 +17,7 @@ from service.database import WeatherRepository
 from service.history_analysis import get_city_history_series, get_history_ranking, month_num_options
 from service.pipeline import refresh_all_data, refresh_city_data
 from service.ranking import build_city_detail_context, build_homepage_context
+from service.refresh_progress import refresh_jobs
 from service.scoring import build_weights
 
 
@@ -226,6 +229,52 @@ def register_routes(app: Flask) -> None:
         preferences = normalize_preferences(request.form or request.args)
         date_text = request.form.get("date") or request.args.get("date") or ""
         return redirect(url_for("home") + "?" + _query_string(preferences, {"date": date_text}))
+
+    @app.post("/refresh/start")
+    def refresh_start():
+        preferences = normalize_preferences(request.form or request.args)
+        date_text = request.form.get("date") or request.args.get("date") or ""
+        redirect_url = url_for("home") + "?" + _query_string(preferences, {"date": date_text})
+        job_id = refresh_jobs.create()
+
+        def run_refresh() -> None:
+            def emit(event: dict) -> None:
+                refresh_jobs.emit(job_id, event)
+
+            try:
+                result = refresh_all_data(progress_callback=emit)
+                refresh_jobs.emit(
+                    job_id,
+                    {
+                        "status": "warning" if result["errors"] else "done",
+                        "stage": "刷新完成",
+                        "message": result["message"],
+                        "next_step": "正在重新加载首页。",
+                        "redirect_url": redirect_url,
+                    },
+                )
+            except Exception as exc:  # pragma: no cover
+                refresh_jobs.emit(
+                    job_id,
+                    {
+                        "status": "error",
+                        "stage": "刷新失败",
+                        "message": f"刷新过程中出现异常：{exc}",
+                        "next_step": "请检查网络或稍后重试。",
+                    },
+                )
+
+        Thread(target=run_refresh, daemon=True).start()
+        return jsonify({"job_id": job_id})
+
+    @app.get("/refresh/events/<job_id>")
+    def refresh_events(job_id: str):
+        @stream_with_context
+        def generate():
+            for event in refresh_jobs.listen(job_id):
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+
+        return Response(generate(), mimetype="text/event-stream")
 
     @app.post("/city/refresh")
     def refresh_city():
