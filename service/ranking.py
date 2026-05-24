@@ -119,6 +119,7 @@ def build_city_detail_context(repository, city_slug: str, selected_date: str, pr
         "dates": [row["date"] for row in chronological_series],
         "api_temps": [row["avg_temp"] for row in chronological_series],
         "ml_temps": [row.get("ml_weather", {}).get("avg_temp") for row in chronological_series],
+        "api_scores": [row.get("rule_score") for row in chronological_series],
         "ml_scores": [row.get("ml_score") for row in chronological_series],
         "rain_probabilities": [
             round(float(row.get("ml_weather", {}).get("rain_probability", 0.0)) * 100, 1)
