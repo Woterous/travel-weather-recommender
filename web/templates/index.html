@@ -32,24 +32,84 @@
 </section>
 
 <section class="search-hero card">
-    <div class="search-hero-copy">
-        <p class="eyebrow">全城搜索</p>
-        <h2>输入一个字，快速联想目的地</h2>
-        <p>支持中文、拼音和英文城市名，例如“广”会优先推荐广州、广陵等候选城市。</p>
-    </div>
-    <form method="get" action="{{ url_for('home') }}" class="search-hero-form" data-city-search-form data-search-url="{{ url_for('city_search_api') }}" data-refresh-url="{{ url_for('refresh_city') }}">
-        <label for="city-search-input">城市名称</label>
+    <form method="get" action="{{ url_for('home') }}" class="search-hero-form">
         <div class="search-input-row">
-            <input id="city-search-input" type="text" name="q" value="{{ search_query }}" placeholder="输入城市名，例如 广 / 广州 / Suzhou / Tokyo" autocomplete="off" data-city-search-input>
+            <input id="city-search-input" type="text" name="q" value="{{ search_query }}" placeholder="找不到你的目标城市？搜索一下！" autocomplete="off">
             <button type="submit" class="button button-primary">搜索城市</button>
         </div>
-        <div class="search-suggestions" data-city-search-suggestions aria-live="polite"></div>
-        <p class="muted" data-city-search-empty hidden>没有找到匹配城市，可以尝试输入更完整的城市名。</p>
         {% for key, value in preferences.items() %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endfor %}
         <input type="hidden" name="date" value="{{ selected_date }}">
     </form>
+
+    {% if search_query %}
+    <div class="city-search-panel">
+        <div>
+            <h3>搜索结果</h3>
+            {% if search_error %}
+                <p class="muted">{{ search_error }}</p>
+            {% elif search_results %}
+                <div class="city-name-list">
+                    {% for result in search_results %}
+                    <form method="get" action="{{ url_for('home') }}">
+                        <input type="hidden" name="q" value="{{ search_query }}">
+                        <input type="hidden" name="candidate_slug" value="{{ result.slug }}">
+                        <input type="hidden" name="candidate_name" value="{{ result.name }}">
+                        <input type="hidden" name="candidate_latitude" value="{{ result.latitude }}">
+                        <input type="hidden" name="candidate_longitude" value="{{ result.longitude }}">
+                        <input type="hidden" name="candidate_province" value="{{ result.province }}">
+                        <input type="hidden" name="candidate_country" value="{{ result.country }}">
+                        <input type="hidden" name="candidate_display_name" value="{{ result.display_name }}">
+                        {% for key, value in preferences.items() %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endfor %}
+                        <input type="hidden" name="date" value="{{ selected_date }}">
+                        <button type="submit">{{ result.name }}</button>
+                    </form>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">没有找到匹配城市，可以尝试输入更完整的城市名。</p>
+            {% endif %}
+        </div>
+
+        {% if selected_search_city %}
+        <div class="selected-city-box">
+            <div class="section-head">
+                <h3>{{ selected_search_city.name }}</h3>
+                <span>{{ selected_search_city.country or "未知地区" }}</span>
+            </div>
+            <ul class="meta-list">
+                <li><span>城市</span><strong>{{ selected_search_city.display_name }}</strong></li>
+                <li><span>纬度</span><strong>{{ selected_search_city.latitude }}</strong></li>
+                <li><span>经度</span><strong>{{ selected_search_city.longitude }}</strong></li>
+            </ul>
+            <form method="post" action="{{ url_for('refresh_city') }}" class="add-city-form">
+                <input type="hidden" name="slug" value="{{ selected_search_city.slug }}">
+                <input type="hidden" name="name" value="{{ selected_search_city.name }}">
+                <input type="hidden" name="latitude" value="{{ selected_search_city.latitude }}">
+                <input type="hidden" name="longitude" value="{{ selected_search_city.longitude }}">
+                <input type="hidden" name="province" value="{{ selected_search_city.province }}">
+                <input type="hidden" name="country" value="{{ selected_search_city.country }}">
+                {% for key, value in preferences.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <button type="submit" class="button button-primary">添加城市</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if added_cities %}
+    <div class="added-city-row">
+        <span>已添加城市</span>
+        {% for item in added_cities[:8] %}
+            <a href="{{ url_for('city_detail', city_slug=item.slug) }}?{{ query_with(preferences, date=selected_date) }}">{{ item.name }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </section>
 
 <section class="controls-grid">
@@ -91,37 +151,6 @@
         </ul>
     </div>
 </section>
-
-{% if search_query %}
-<section class="card">
-    <div class="section-head">
-        <h2>搜索结果</h2>
-        <span>{{ search_query }}</span>
-    </div>
-    {% if search_error %}
-        <p class="muted">{{ search_error }}</p>
-    {% elif search_results %}
-        <div class="search-result-grid">
-            {% for result in search_results %}
-            <form method="post" action="{{ url_for('refresh_city') }}" class="search-result-item">
-                <strong>{{ result.display_name }}</strong>
-                <span>{{ result.source }}</span>
-                <input type="hidden" name="slug" value="{{ result.slug }}">
-                <input type="hidden" name="name" value="{{ result.name }}">
-                <input type="hidden" name="latitude" value="{{ result.latitude }}">
-                <input type="hidden" name="longitude" value="{{ result.longitude }}">
-                {% for key, value in preferences.items() %}
-                    <input type="hidden" name="{{ key }}" value="{{ value }}">
-                {% endfor %}
-                <button type="submit" class="button">刷新并查看</button>
-            </form>
-            {% endfor %}
-        </div>
-    {% else %}
-        <p class="muted">没有找到匹配城市。</p>
-    {% endif %}
-</section>
-{% endif %}
 
 <section class="controls-grid">
     <div class="card">

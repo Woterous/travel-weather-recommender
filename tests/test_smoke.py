@@ -1,5 +1,6 @@
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 from datetime import date
 from unittest import mock
@@ -15,6 +16,7 @@ from service.city_search import city_from_search_payload
 from service.city_search import search_cities
 from service.clean_data import build_forecast_dataset, build_history_daily_dataset
 from service.database import _sanitize_refresh_message
+from service import database
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
 from service import pipeline
 from service.refresh_progress import RefreshJobStore
@@ -103,6 +105,22 @@ class SearchAndModelTest(unittest.TestCase):
 
         self.assertEqual(city.slug, "geo-1809858")
         self.assertEqual(city.name, "广州")
+
+    def test_added_city_record_is_persisted(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
+
+                repo.add_city_record(city, province="广东", country="中国")
+                added = repo.get_added_cities()
+
+                self.assertEqual(added[0]["slug"], "geo-1809858")
+                self.assertEqual(added[0]["name"], "广州")
+            finally:
+                database.DB_PATH = original_db_path
 
     def test_city_search_suggests_curated_matches_for_single_character(self) -> None:
         class FailingClient:

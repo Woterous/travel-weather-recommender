@@ -115,6 +115,20 @@ def ensure_database() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS added_cities (
+                slug TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                pinyin TEXT,
+                latitude REAL,
+                longitude REAL,
+                province TEXT,
+                country TEXT,
+                added_time TEXT NOT NULL
+            )
+            """
+        )
         connection.commit()
     finally:
         connection.close()
@@ -190,12 +204,58 @@ class WeatherRepository:
             SELECT city_slug, city_name, MAX(crawl_time) AS crawl_time
             FROM forecast_daily
             GROUP BY city_slug, city_name
+            UNION
+            SELECT slug AS city_slug, name AS city_name, added_time AS crawl_time
+            FROM added_cities
             ORDER BY city_name
             """
         )
         if df.empty:
             return []
         return df.rename(columns={"city_slug": "slug", "city_name": "name"}).to_dict("records")
+
+    def add_city_record(self, city, province: str = "", country: str = "") -> None:
+        connection = get_connection()
+        try:
+            connection.execute(
+                """
+                INSERT INTO added_cities
+                    (slug, name, pinyin, latitude, longitude, province, country, added_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(slug) DO UPDATE SET
+                    name = excluded.name,
+                    pinyin = excluded.pinyin,
+                    latitude = excluded.latitude,
+                    longitude = excluded.longitude,
+                    province = excluded.province,
+                    country = excluded.country,
+                    added_time = excluded.added_time
+                """,
+                (
+                    city.slug,
+                    city.name,
+                    city.pinyin,
+                    city.latitude,
+                    city.longitude,
+                    province,
+                    country,
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def get_added_cities(self) -> list[dict]:
+        df = self._read_df(
+            """
+            SELECT slug, name, province, country, added_time
+            FROM added_cities
+            ORDER BY added_time DESC
+            """
+        )
+        if df.empty:
+            return []
+        return df.to_dict("records")
 
     def get_city_meta(self, city_slug: str) -> dict | None:
         df = self._read_df(

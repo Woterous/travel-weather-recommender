@@ -29,6 +29,18 @@ def _city_to_search_result(city: CityConfig, province: str, source: str, country
     }
 
 
+def _dedupe_city_results(results: list[dict]) -> list[dict]:
+    deduped = []
+    seen_names = set()
+    for item in results:
+        key = str(item.get("name", "")).strip().lower()
+        if not key or key in seen_names:
+            continue
+        seen_names.add(key)
+        deduped.append(item)
+    return deduped
+
+
 def _geo_slug(record: dict) -> str:
     geo_id = record.get("id")
     if geo_id:
@@ -64,12 +76,17 @@ def search_cities(query: str, client: HttpClient | None = None) -> list[dict]:
         if cleaned.lower() in city.name.lower() or cleaned.lower() in city.pinyin.lower()
     ]
 
-    http_client = client or HttpClient()
+    local_matches = fixed_matches + curated_matches
+    has_exact_local_match = any(item["name"].lower() == cleaned.lower() for item in local_matches)
+    should_search_remote = len(cleaned) > 1 and not has_exact_local_match
+
     payload = {"results": []}
-    try:
-        payload = http_client.get_json(build_geocoding_api_url(cleaned))
-    except Exception:
-        payload = {"results": []}
+    if should_search_remote:
+        http_client = client or HttpClient()
+        try:
+            payload = http_client.get_json(build_geocoding_api_url(cleaned))
+        except Exception:
+            payload = {"results": []}
     remote_matches = []
     seen_slugs = {item["slug"] for item in fixed_matches + curated_matches}
     for record in payload.get("results", []) or []:
@@ -91,7 +108,7 @@ def search_cities(query: str, client: HttpClient | None = None) -> list[dict]:
             }
         )
 
-    return (fixed_matches + curated_matches + remote_matches)[:8]
+    return _dedupe_city_results(local_matches + remote_matches)[:8]
 
 
 def city_from_search_payload(payload: dict) -> CityConfig:

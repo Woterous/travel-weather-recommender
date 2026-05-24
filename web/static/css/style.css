@@ -179,18 +179,8 @@ a {
 
 .search-hero {
     display: grid;
-    grid-template-columns: minmax(260px, 0.75fr) minmax(0, 1.25fr);
-    gap: 24px;
-    align-items: center;
-    padding: clamp(24px, 4vw, 42px);
-    background:
-        radial-gradient(circle at 88% 20%, rgba(217, 140, 63, 0.22), transparent 28%),
-        linear-gradient(135deg, rgba(22, 90, 114, 0.12), rgba(255, 252, 247, 0.94) 54%);
-}
-
-.search-hero-copy h2 {
-    margin: 0 0 10px;
-    font-size: clamp(1.8rem, 3vw, 3rem);
+    gap: 16px;
+    padding: 20px;
 }
 
 .search-hero-form {
@@ -205,45 +195,65 @@ a {
 }
 
 .search-input-row input[type="text"] {
-    min-height: 56px;
-    border-radius: 20px;
-    font-size: 1.05rem;
+    min-height: 52px;
+    border-radius: 999px;
+    font-size: 1rem;
 }
 
 .search-input-row .button {
     min-width: 132px;
 }
 
-.search-suggestions {
+.city-search-panel {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr) minmax(280px, 0.75fr);
+    gap: 18px;
+    align-items: start;
+    padding-top: 4px;
+    border-top: 1px dashed var(--line);
+}
+
+.city-name-list {
+    display: flex;
+    flex-wrap: wrap;
     gap: 10px;
 }
 
-.search-suggestion {
-    display: grid;
-    gap: 6px;
-    min-height: 82px;
-    padding: 14px;
-    text-align: left;
+.city-name-list form {
+    margin: 0;
+}
+
+.city-name-list button,
+.added-city-row a {
+    padding: 8px 13px;
     border: 1px solid rgba(22, 90, 114, 0.16);
-    border-radius: 18px;
-    background: rgba(255, 255, 255, 0.72);
-    color: var(--ink);
+    border-radius: 999px;
+    background: rgba(22, 90, 114, 0.08);
+    color: var(--brand-strong);
     cursor: pointer;
-    transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+    font: inherit;
 }
 
-.search-suggestion:hover {
-    transform: translateY(-2px);
-    border-color: rgba(22, 90, 114, 0.42);
-    background: rgba(255, 255, 255, 0.94);
+.selected-city-box {
+    display: grid;
+    gap: 12px;
+    padding: 16px;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.58);
 }
 
-.search-suggestion span {
+.add-city-form {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.added-city-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
     color: var(--muted);
-    font-size: 0.86rem;
-    line-height: 1.35;
 }
 
 select,
@@ -732,8 +742,8 @@ input[type="text"] {
         grid-template-columns: 1fr;
     }
 
-    .search-suggestions {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+    .city-search-panel {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -759,8 +769,7 @@ input[type="text"] {
         grid-template-columns: 1fr;
     }
 
-    .search-input-row,
-    .search-suggestions {
+    .search-input-row {
         grid-template-columns: 1fr;
     }
 

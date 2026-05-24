@@ -57,6 +57,21 @@ def _aqi_display(value) -> str:
     return f"{numeric:.0f}"
 
 
+def _selected_search_city_from_args(args) -> dict | None:
+    slug = args.get("candidate_slug", "").strip()
+    if not slug:
+        return None
+    return {
+        "slug": slug,
+        "name": args.get("candidate_name", "").strip() or "搜索城市",
+        "latitude": args.get("candidate_latitude", "").strip(),
+        "longitude": args.get("candidate_longitude", "").strip(),
+        "province": args.get("candidate_province", "").strip(),
+        "country": args.get("candidate_country", "").strip(),
+        "display_name": args.get("candidate_display_name", "").strip() or args.get("candidate_name", "").strip(),
+    }
+
+
 def _city_for_detail(repository: WeatherRepository, city_slug: str):
     if city_slug in CITY_BY_SLUG:
         return CITY_BY_SLUG[city_slug]
@@ -95,6 +110,7 @@ def register_routes(app: Flask) -> None:
         search_query = request.args.get("q", "").strip()
         search_results = []
         search_error = ""
+        selected_search_city = _selected_search_city_from_args(request.args)
         if search_query:
             try:
                 search_results = search_cities(search_query)
@@ -122,6 +138,8 @@ def register_routes(app: Flask) -> None:
             search_query=search_query,
             search_results=search_results,
             search_error=search_error,
+            selected_search_city=selected_search_city,
+            added_cities=repository.get_added_cities(),
             **context,
         )
 
@@ -282,6 +300,12 @@ def register_routes(app: Flask) -> None:
         preferences = normalize_preferences(request.form)
         city = city_from_search_payload(request.form)
         result = refresh_city_data(city)
+        repository = WeatherRepository()
+        repository.add_city_record(
+            city,
+            province=request.form.get("province", ""),
+            country=request.form.get("country", ""),
+        )
         if result["errors"]:
             flash(result["message"], "warning")
         else:
