@@ -2,12 +2,28 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
+import re
 
 import pandas as pd
 
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DB_PATH = BASE_DIR / "data" / "db" / "weather_recommender.sqlite3"
+
+
+def _sanitize_refresh_message(message: str) -> str:
+    cleaned = re.sub(
+        r"历史数据抓取失败:\s*([^-\s]+)\s*->\s*429 Client Error:.*?(?=(?:\s+[^\s]+数据抓取失败:)|$)",
+        r"历史数据暂时不可用：\1 请求过于频繁，本次未更新，请稍后重试。",
+        message,
+    )
+    cleaned = re.sub(
+        r"(未来天气补充数据失败|AQI 数据抓取失败|历史数据抓取失败|未来天气 API 数据失败|AQI 数据失败|历史数据失败):\s*([^-\s]+)\s*->\s*[^。]*",
+        r"\1：\2 本次未更新，请稍后重试。",
+        cleaned,
+    )
+    cleaned = re.sub(r"https?://\S+", "", cleaned).strip()
+    return cleaned
 
 
 def get_connection() -> sqlite3.Connection:
@@ -219,7 +235,9 @@ class WeatherRepository:
         )
         if df.empty:
             return {"refresh_time": "未刷新", "status": "empty", "message": "当前数据库中还没有抓取记录。"}
-        return df.iloc[0].to_dict()
+        row = df.iloc[0].to_dict()
+        row["message"] = _sanitize_refresh_message(str(row.get("message", "")))
+        return row
 
     def aqi_available(self) -> bool:
         df = self._read_df("SELECT MAX(aqi) AS max_aqi FROM forecast_daily")

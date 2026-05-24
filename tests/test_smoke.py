@@ -12,6 +12,7 @@ from app import app
 from config.cities import CityConfig
 from service.city_search import city_from_search_payload
 from service.clean_data import build_forecast_dataset, build_history_daily_dataset
+from service.database import _sanitize_refresh_message
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
 from service import pipeline
 from service.refresh_progress import RefreshJobStore
@@ -312,6 +313,28 @@ class RefreshProgressTest(unittest.TestCase):
         self.assertEqual(result["errors"], [])
         self.assertIn("Open-Meteo API 兜底", result["message"])
         self.assertNotIn("HTTPSConnectionPool", result["message"])
+
+    def test_refresh_message_hides_raw_client_error_url(self) -> None:
+        raw_message = (
+            "未来天气 70 条，AQI 50 条，历史月度统计 576 条，历史日样本 17514 条。 "
+            "历史数据抓取失败: 三亚 -> 429 Client Error: Too Many Requests for url: "
+            "https://archive-api.open-meteo.com/v1/archive?latitude=18.25&longitude=109.51"
+        )
+
+        cleaned = _sanitize_refresh_message(raw_message)
+
+        self.assertIn("历史数据暂时不可用：三亚 请求过于频繁", cleaned)
+        self.assertNotIn("Client Error", cleaned)
+        self.assertNotIn("https://", cleaned)
+
+    def test_friendly_fetch_error_hides_exception_details(self) -> None:
+        message = pipeline._friendly_fetch_error(
+            "历史数据",
+            "三亚",
+            RuntimeError("429 Client Error: Too Many Requests for url: https://example.test/raw"),
+        )
+
+        self.assertEqual(message, "历史数据暂时不可用：三亚 请求过于频繁，本次未更新，请稍后重试。")
 
 
 if __name__ == "__main__":

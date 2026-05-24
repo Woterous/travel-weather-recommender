@@ -24,6 +24,14 @@ RAW_HISTORY_DIR = BASE_DIR / "data" / "raw" / "history"
 RAW_AIR_QUALITY_DIR = BASE_DIR / "data" / "raw" / "air_quality"
 
 
+def _friendly_fetch_error(data_name: str, city_name: str, exc: Exception) -> str:
+    status_code = getattr(getattr(exc, "response", None), "status_code", None)
+    error_text = str(exc)
+    if status_code == 429 or "429" in error_text or "Too Many Requests" in error_text:
+        return f"{data_name}暂时不可用：{city_name} 请求过于频繁，本次未更新，请稍后重试。"
+    return f"{data_name}暂时不可用：{city_name} 本次未更新，请稍后重试。"
+
+
 def _save_json(path: Path, payload: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -105,7 +113,7 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
             suffix = crawl_time.replace(":", "-")
             _save_json(RAW_FORECAST_DIR / f"{city.slug}_api_{suffix}.json", api_payload)
         except Exception as exc:  # pragma: no cover
-            errors.append(f"未来天气补充数据失败: {city.name} -> {exc}")
+            errors.append(_friendly_fetch_error("未来天气补充数据", city.name, exc))
 
         step += 1
         _emit_progress(
@@ -133,7 +141,7 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
             suffix = crawl_time.replace(":", "-")
             _save_json(RAW_AIR_QUALITY_DIR / f"{city.slug}_{suffix}.json", air_quality_payload)
         except Exception as exc:  # pragma: no cover
-            errors.append(f"AQI 数据抓取失败: {city.name} -> {exc}")
+            errors.append(_friendly_fetch_error("AQI 数据", city.name, exc))
 
         step += 1
         _emit_progress(
@@ -160,7 +168,7 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
             history_payloads[city.slug] = history_payload
             _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
         except Exception as exc:  # pragma: no cover
-            errors.append(f"历史数据抓取失败: {city.name} -> {exc}")
+            errors.append(_friendly_fetch_error("历史数据", city.name, exc))
 
         step += 1
         next_city_index = CITIES.index(city) + 1
@@ -280,7 +288,7 @@ def refresh_city_data(city) -> dict:
         suffix = crawl_time.replace(":", "-")
         _save_json(RAW_FORECAST_DIR / f"{city.slug}_api_{suffix}.json", api_payload)
     except Exception as exc:  # pragma: no cover
-        errors.append(f"未来天气 API 数据失败: {city.name} -> {exc}")
+        errors.append(_friendly_fetch_error("未来天气 API 数据", city.name, exc))
 
     try:
         air_quality_payload = fetch_air_quality_api(city, client=client)
@@ -288,14 +296,14 @@ def refresh_city_data(city) -> dict:
         suffix = crawl_time.replace(":", "-")
         _save_json(RAW_AIR_QUALITY_DIR / f"{city.slug}_{suffix}.json", air_quality_payload)
     except Exception as exc:  # pragma: no cover
-        errors.append(f"AQI 数据失败: {city.name} -> {exc}")
+        errors.append(_friendly_fetch_error("AQI 数据", city.name, exc))
 
     try:
         history_payload = fetch_history_daily(city, client=client)
         history_payloads[city.slug] = history_payload
         _save_json(RAW_HISTORY_DIR / f"{city.slug}_{crawl_time.replace(':', '-')}.json", history_payload)
     except Exception as exc:  # pragma: no cover
-        errors.append(f"历史数据失败: {city.name} -> {exc}")
+        errors.append(_friendly_fetch_error("历史数据", city.name, exc))
 
     forecast_df = build_forecast_dataset({}, api_payloads, crawl_time, air_quality_payloads)
     history_df = build_history_monthly_dataset(history_payloads, crawl_time)
