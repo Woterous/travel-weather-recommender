@@ -1,3 +1,13 @@
+const TW_APP = window.TW_APP || (window.TW_APP = {
+    charts: [],
+    navigationReady: false,
+    routeController: null,
+    scrollCleanup: null,
+    scrollPositions: {},
+    currentUrl: window.location.href,
+    skipRevealOnce: false
+});
+
 function baseChartOption(title) {
     return {
         backgroundColor: "transparent",
@@ -26,7 +36,18 @@ function safeInitChart(elementId) {
     if (!node || typeof echarts === "undefined") {
         return null;
     }
-    return echarts.init(node);
+    const chart = echarts.init(node);
+    TW_APP.charts.push(chart);
+    return chart;
+}
+
+function disposeRenderedCharts() {
+    TW_APP.charts.forEach((chart) => {
+        if (chart && typeof chart.dispose === "function" && !chart.isDisposed()) {
+            chart.dispose();
+        }
+    });
+    TW_APP.charts = [];
 }
 
 window.renderBarChart = function renderBarChart(elementId, payload) {
@@ -130,6 +151,8 @@ function initAssistant() {
     const form = document.querySelector("[data-ai-form]");
     const messages = document.querySelector("[data-ai-messages]");
     if (!panel || !form || !messages) return;
+    if (panel.dataset.aiReady === "1") return;
+    panel.dataset.aiReady = "1";
 
     toggles.forEach((toggle) => {
         toggle.addEventListener("click", () => {
@@ -170,8 +193,6 @@ function initAssistant() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", initAssistant);
-
 function initCitySuggestions() {
     const form = document.querySelector("[data-city-suggest-form]");
     if (!form) return;
@@ -207,7 +228,12 @@ function initCitySuggestions() {
         params.set("longitude", city.longitude || "");
         params.set("province", city.province || "");
         params.set("country", city.country || "");
+        params.set("return_to", `${window.location.pathname}${window.location.search || ""}#search`);
         target.search = params.toString();
+        if (window.navigateWithinApp) {
+            window.navigateWithinApp(target.toString());
+            return;
+        }
         window.location.href = target.toString();
     }
 
@@ -285,12 +311,12 @@ function initCitySuggestions() {
     });
 }
 
-document.addEventListener("DOMContentLoaded", initCitySuggestions);
-
 function initRefreshProgress() {
     const form = document.querySelector(".refresh-form");
     const modal = document.querySelector("[data-refresh-modal]");
     if (!form || !modal || typeof EventSource === "undefined") return;
+    if (form.dataset.refreshProgressReady === "1") return;
+    form.dataset.refreshProgressReady = "1";
 
     const percentNode = modal.querySelector("[data-refresh-percent]");
     const barNode = modal.querySelector("[data-refresh-bar]");
@@ -343,6 +369,11 @@ function initRefreshProgress() {
             if (eventSource) eventSource.close();
             if (event.status !== "error" && redirectUrl) {
                 window.setTimeout(() => {
+                    modal.classList.remove("open");
+                    if (window.navigateWithinApp) {
+                        window.navigateWithinApp(redirectUrl, { preserveScroll: true });
+                        return;
+                    }
                     window.location.href = redirectUrl;
                 }, 900);
             }
@@ -374,7 +405,8 @@ function initRefreshProgress() {
         }
     });
 
-    if (closeNode) {
+    if (closeNode && closeNode.dataset.refreshCloseReady !== "1") {
+        closeNode.dataset.refreshCloseReady = "1";
         closeNode.addEventListener("click", () => {
             modal.classList.remove("open");
         });
@@ -394,11 +426,11 @@ function initRefreshProgress() {
     }
 }
 
-document.addEventListener("DOMContentLoaded", initRefreshProgress);
-
 function initCityAutoload() {
     const panel = document.querySelector("[data-city-autoload]");
     if (!panel) return;
+    if (panel.dataset.cityAutoloadReady === "1") return;
+    panel.dataset.cityAutoloadReady = "1";
     const form = panel.querySelector("[data-city-load-form]");
     const messageNode = panel.querySelector("[data-city-load-message]");
     const barNode = panel.querySelector("[data-city-load-bar]");
@@ -419,7 +451,11 @@ function initCityAutoload() {
         if (messageNode) messageNode.textContent = event.message || "";
         if (event.redirect_url && ["done", "warning"].includes(event.status)) {
             window.setTimeout(() => {
-                window.location.href = event.redirect_url;
+                if (window.navigateWithinApp) {
+                    window.navigateWithinApp(event.redirect_url, { preserveScroll: true, replaceHistory: true });
+                    return;
+                }
+                window.location.replace(event.redirect_url);
             }, 700);
         }
     }
@@ -448,8 +484,6 @@ function initCityAutoload() {
             if (messageNode) messageNode.textContent = "无法启动城市数据加载，请返回首页重试。";
         });
 }
-
-document.addEventListener("DOMContentLoaded", initCityAutoload);
 
 function initPreferenceSliders() {
     const form = document.querySelector("[data-preference-form]");
@@ -501,7 +535,12 @@ function initPreferenceSliders() {
                 return;
             }
             lastQuery = query;
-            window.location.href = `${form.action}?${query}`;
+            const target = `${form.action}?${query}`;
+            if (window.navigateWithinApp) {
+                window.navigateWithinApp(target, { preserveScroll: true });
+                return;
+            }
+            window.location.href = target;
         }, delay);
     }
 
@@ -532,8 +571,6 @@ function initPreferenceSliders() {
         });
     }
 }
-
-document.addEventListener("DOMContentLoaded", initPreferenceSliders);
 
 function initCustomSelect(select) {
     if (!select || select.dataset.customSelectReady === "1") return;
@@ -700,18 +737,77 @@ function initAutoSubmitSelects() {
     });
 }
 
-document.addEventListener("DOMContentLoaded", initAutoSubmitSelects);
+function initFloatingDateSwitchers() {
+    document.querySelectorAll(".floating-date-switcher").forEach((form) => {
+        if (form.dataset.floatingDateReady === "1") return;
+        form.dataset.floatingDateReady = "1";
+        const toggle = form.querySelector(".floating-date-handle");
+        if (!toggle) return;
+
+        toggle.addEventListener("click", () => {
+            form.classList.toggle("open");
+            const selectButton = form.querySelector(".custom-select-button");
+            if (form.classList.contains("open") && selectButton) {
+                window.setTimeout(() => selectButton.focus({ preventScroll: true }), 80);
+            }
+        });
+    });
+}
+
+function initSmartBackButtons() {
+    document.querySelectorAll("[data-smart-back]").forEach((button) => {
+        if (button.dataset.smartBackReady === "1") return;
+        button.dataset.smartBackReady = "1";
+        button.addEventListener("click", () => {
+            const fallback = button.dataset.fallbackUrl || "/";
+            const routeMismatch = renderedRouteBase().startsWith("/city/") && !window.location.pathname.startsWith("/city/");
+            const useStoredSource = button.dataset.useStoredSource === "1";
+            const target =
+                button.dataset.returnUrl ||
+                (useStoredSource ? sessionStorage.getItem("tw:lastDetailSourceUrl") : "") ||
+                (useStoredSource ? sessionStorage.getItem("tw:lastSearchUrl") : "") ||
+                (button.dataset.preferFallback === "1" || routeMismatch ? fallback : "");
+            if (target) {
+                if (window.navigateWithinApp) {
+                    window.navigateWithinApp(target, { restoreScroll: true, replaceHistory: button.dataset.preferFallback === "1" });
+                    return;
+                }
+                if (button.dataset.preferFallback === "1") {
+                    window.location.replace(target);
+                    return;
+                }
+                window.location.href = target;
+                return;
+            }
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            if (window.navigateWithinApp) {
+                window.navigateWithinApp(fallback);
+                return;
+            }
+            window.location.href = fallback;
+        });
+    });
+}
 
 function initScrollExperience() {
+    if (typeof TW_APP.scrollCleanup === "function") {
+        TW_APP.scrollCleanup();
+        TW_APP.scrollCleanup = null;
+    }
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const skipReveal = TW_APP.skipRevealOnce;
+    TW_APP.skipRevealOnce = false;
     const sections = document.querySelectorAll(".main-content > section, .main-content > div");
     sections.forEach((section) => {
         section.classList.add("reveal");
     });
 
-    if (reduceMotion || typeof IntersectionObserver === "undefined") {
+    if (skipReveal || reduceMotion || typeof IntersectionObserver === "undefined") {
         sections.forEach((section) => section.classList.add("is-visible"));
-        return;
+        if (reduceMotion || typeof IntersectionObserver === "undefined") return;
     }
 
     const observer = new IntersectionObserver((entries) => {
@@ -726,13 +822,18 @@ function initScrollExperience() {
         rootMargin: "0px 0px -8% 0px"
     });
 
-    sections.forEach((section, index) => {
-        section.style.transitionDelay = `${Math.min(index * 45, 180)}ms`;
-        observer.observe(section);
-    });
+    if (!skipReveal) {
+        sections.forEach((section, index) => {
+            section.style.transitionDelay = `${Math.min(index * 45, 180)}ms`;
+            observer.observe(section);
+        });
+    }
 
     const heroVisual = document.querySelector("[data-parallax-visual]");
-    if (!heroVisual) return;
+    if (!heroVisual) {
+        TW_APP.scrollCleanup = () => observer.disconnect();
+        return;
+    }
     let ticking = false;
     function updateParallax() {
         const rect = heroVisual.getBoundingClientRect();
@@ -740,13 +841,255 @@ function initScrollExperience() {
         heroVisual.style.transform = `translateY(${progress * -10}px) scale(${1 + Math.abs(progress) * 0.012})`;
         ticking = false;
     }
-    window.addEventListener("scroll", () => {
+    const onScroll = () => {
         if (!ticking) {
             window.requestAnimationFrame(updateParallax);
             ticking = true;
         }
-    }, { passive: true });
+    };
+    window.addEventListener("scroll", onScroll, { passive: true });
+    TW_APP.scrollCleanup = () => {
+        observer.disconnect();
+        window.removeEventListener("scroll", onScroll);
+    };
     updateParallax();
 }
 
-document.addEventListener("DOMContentLoaded", initScrollExperience);
+function executeInlinePageScripts(nextDocument) {
+    const scripts = Array.from(nextDocument.body.querySelectorAll("script:not([src])"));
+    scripts.forEach((script) => {
+        const executable = document.createElement("script");
+        executable.textContent = script.textContent;
+        document.body.appendChild(executable);
+        executable.remove();
+    });
+}
+
+function replaceFlashStack(nextDocument) {
+    const currentTopbar = document.querySelector(".topbar");
+    const currentFlash = document.querySelector(".flash-stack");
+    const nextFlash = nextDocument.querySelector(".flash-stack");
+
+    if (currentFlash) currentFlash.remove();
+    if (nextFlash && currentTopbar) {
+        currentTopbar.insertAdjacentElement("afterend", document.importNode(nextFlash, true));
+    }
+}
+
+function routeKey(url) {
+    const parsed = new URL(url, window.location.href);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+function renderedRouteBase() {
+    const main = document.querySelector(".main-content");
+    if (!main || !main.dataset.routePath) {
+        const parsed = new URL(TW_APP.currentUrl || window.location.href, window.location.href);
+        return `${parsed.pathname}${parsed.search}`;
+    }
+    const search = main.dataset.routeSearch ? `?${main.dataset.routeSearch}` : "";
+    return `${main.dataset.routePath}${search}`;
+}
+
+function rememberDetailSource(targetUrl) {
+    const target = new URL(targetUrl, window.location.href);
+    const current = new URL(TW_APP.currentUrl || window.location.href, window.location.href);
+    if (!target.pathname.startsWith("/city/")) return;
+    if (current.pathname.startsWith("/city/")) return;
+    sessionStorage.setItem("tw:lastDetailSourceUrl", `${current.pathname}${current.search}${current.hash || ""}`);
+}
+
+async function navigateWithinApp(url, options = {}) {
+    const target = new URL(url, window.location.href);
+    if (target.origin !== window.location.origin) {
+        window.location.href = target.toString();
+        return false;
+    }
+
+    const sameDocument = `${target.pathname}${target.search}` === renderedRouteBase() && target.hash;
+    if (sameDocument) {
+        const anchor = document.querySelector(target.hash);
+        if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (routeKey(target.toString()) !== routeKey(window.location.href)) {
+            history.pushState({}, "", target.toString());
+        }
+        TW_APP.currentUrl = target.toString();
+        return true;
+    }
+
+    if (TW_APP.routeController) {
+        TW_APP.routeController.abort();
+    }
+    const routeController = new AbortController();
+    TW_APP.routeController = routeController;
+
+    const main = document.querySelector(".main-content");
+    const previousScrollY = window.scrollY;
+    const smoothUpdate =
+        Boolean(options.smoothUpdate || options.preserveScroll || options.restoreScroll) ||
+        `${target.pathname}${target.search}` === renderedRouteBase();
+    if (TW_APP.currentUrl) {
+        TW_APP.scrollPositions[TW_APP.currentUrl] = previousScrollY;
+    }
+    document.documentElement.classList.add("is-route-loading");
+    if (main && !smoothUpdate) main.classList.add("is-route-loading");
+
+    try {
+        rememberDetailSource(target.toString());
+        const response = await fetch(target.toString(), {
+            headers: {
+                "Accept": "text/html",
+                "X-Requested-With": "XMLHttpRequest"
+            },
+            signal: routeController.signal
+        });
+        const contentType = response.headers.get("content-type") || "";
+        if (!response.ok || !contentType.includes("text/html")) {
+            throw new Error(`Navigation failed: ${response.status}`);
+        }
+
+        const nextDocument = new DOMParser().parseFromString(await response.text(), "text/html");
+        const nextMain = nextDocument.querySelector(".main-content");
+        const currentMain = document.querySelector(".main-content");
+        if (!nextMain || !currentMain) {
+            throw new Error("Response did not include main content.");
+        }
+
+        disposeRenderedCharts();
+
+        const nextTopbar = nextDocument.querySelector(".topbar");
+        const currentTopbar = document.querySelector(".topbar");
+        if (nextTopbar && currentTopbar) {
+            currentTopbar.replaceWith(document.importNode(nextTopbar, true));
+        }
+
+        document.title = nextDocument.title || document.title;
+        replaceFlashStack(nextDocument);
+        currentMain.className = nextMain.className;
+        currentMain.dataset.routePath = nextMain.dataset.routePath || target.pathname;
+        currentMain.dataset.routeSearch = nextMain.dataset.routeSearch || target.search.replace(/^\?/, "");
+        currentMain.innerHTML = nextMain.innerHTML;
+        if (!smoothUpdate) {
+            currentMain.classList.remove("page-transition");
+            void currentMain.offsetWidth;
+            currentMain.classList.add("page-transition");
+        }
+
+        if (options.replaceHistory) {
+            history.replaceState({}, "", target.toString());
+        } else if (!options.skipHistory) {
+            history.pushState({}, "", target.toString());
+        }
+        TW_APP.currentUrl = target.toString();
+        TW_APP.skipRevealOnce = smoothUpdate;
+        initPage();
+        executeInlinePageScripts(nextDocument);
+
+        window.requestAnimationFrame(() => {
+            if (options.preserveScroll) {
+                window.scrollTo(0, previousScrollY);
+                return;
+            }
+            if (options.restoreScroll && TW_APP.scrollPositions[target.toString()] !== undefined) {
+                window.scrollTo(0, TW_APP.scrollPositions[target.toString()]);
+                return;
+            }
+            if (target.hash) {
+                const anchor = document.querySelector(target.hash);
+                if (anchor) {
+                    anchor.scrollIntoView({ behavior: "smooth", block: "start" });
+                    return;
+                }
+            }
+            window.scrollTo(0, 0);
+        });
+        return true;
+    } catch (error) {
+        if (error.name === "AbortError") return false;
+        window.location.href = target.toString();
+        return false;
+    } finally {
+        if (TW_APP.routeController === routeController) {
+            document.documentElement.classList.remove("is-route-loading");
+            const currentMain = document.querySelector(".main-content");
+            if (currentMain) currentMain.classList.remove("is-route-loading");
+            TW_APP.routeController = null;
+        }
+    }
+}
+
+function initEnhancedNavigation() {
+    if (TW_APP.navigationReady) return;
+    TW_APP.navigationReady = true;
+    window.history.scrollRestoration = "manual";
+    window.navigateWithinApp = navigateWithinApp;
+
+    document.addEventListener("click", (event) => {
+        const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+        if (!link || event.defaultPrevented || event.button !== 0) return;
+        if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (link.target && link.target !== "_self") return;
+        if (link.hasAttribute("download") || link.dataset.noPjax === "1") return;
+
+        const target = new URL(link.href, window.location.href);
+        if (target.origin !== window.location.origin) return;
+        if (target.pathname === window.location.pathname && target.search === window.location.search && target.hash) return;
+
+        event.preventDefault();
+        navigateWithinApp(target.toString());
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!(event.target instanceof Element)) return;
+        document.querySelectorAll(".floating-date-switcher.open").forEach((form) => {
+            if (!form.contains(event.target)) {
+                form.classList.remove("open");
+            }
+        });
+    });
+
+    document.addEventListener("submit", (event) => {
+        const form = event.target;
+        if (!(form instanceof HTMLFormElement) || form.dataset.noPjax === "1") return;
+        const method = (form.method || "get").toLowerCase();
+        if (method !== "get") return;
+
+        const target = new URL(form.action || window.location.href, window.location.href);
+        if (target.origin !== window.location.origin) return;
+        target.search = new URLSearchParams(new FormData(form)).toString();
+
+        const preserveScroll =
+            form.hasAttribute("data-auto-submit-form") ||
+            form.hasAttribute("data-preference-form") ||
+            target.pathname === window.location.pathname;
+        event.preventDefault();
+        navigateWithinApp(target.toString(), { preserveScroll });
+    });
+
+    window.addEventListener("popstate", () => {
+        navigateWithinApp(window.location.href, { restoreScroll: true, skipHistory: true });
+    });
+}
+
+function initPage() {
+    if (window.location.pathname === "/" && window.location.search.includes("q=")) {
+        sessionStorage.setItem("tw:lastSearchUrl", `${window.location.pathname}${window.location.search}#search`);
+    }
+    initCitySuggestions();
+    initRefreshProgress();
+    initCityAutoload();
+    initPreferenceSliders();
+    initAutoSubmitSelects();
+    initFloatingDateSwitchers();
+    initSmartBackButtons();
+    initScrollExperience();
+}
+
+function bootApp() {
+    TW_APP.currentUrl = window.location.href;
+    initAssistant();
+    initEnhancedNavigation();
+    initPage();
+}
+
+document.addEventListener("DOMContentLoaded", bootApp);

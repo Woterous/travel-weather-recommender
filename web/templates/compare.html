@@ -8,6 +8,9 @@
         <p class="eyebrow">城市对比页</p>
         <h1>双城市对比</h1>
         <p>对比总分、天气维度和历史月度表现。</p>
+        <div class="hero-actions">
+            <button type="button" class="button button-primary" data-smart-back data-fallback-url="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date) }}">返回上一页</button>
+        </div>
     </div>
     <form method="get" action="{{ url_for('compare_page') }}" class="card filter-form" data-auto-submit-form>
         <label>日期</label>
