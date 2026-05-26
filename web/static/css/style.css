@@ -315,6 +315,25 @@ select {
     margin-bottom: 14px;
 }
 
+.floating-status .meta-list li {
+    display: grid;
+    grid-template-columns: minmax(86px, auto) minmax(0, 1fr);
+    align-items: center;
+    gap: 14px;
+}
+
+.floating-status .meta-list span {
+    min-width: 0;
+    white-space: nowrap;
+}
+
+.floating-status .meta-list strong {
+    min-width: 0;
+    text-align: right;
+    overflow-wrap: anywhere;
+    font-variant-numeric: tabular-nums;
+}
+
 .card,
 .city-card,
 .hero-meta,
