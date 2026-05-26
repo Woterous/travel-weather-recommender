@@ -320,6 +320,48 @@ class SearchAndModelTest(unittest.TestCase):
             finally:
                 database.DB_PATH = original_db_path
 
+    def test_refresh_city_start_builds_redirect_outside_request_context(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                captured = {}
+                job_store = RefreshJobStore()
+
+                class DelayedThread:
+                    def __init__(self, target, daemon=False):
+                        captured["target"] = target
+
+                    def start(self):
+                        pass
+
+                with mock.patch("web.routes.refresh_jobs", job_store), \
+                    mock.patch("web.routes.Thread", DelayedThread), \
+                    mock.patch("web.routes.refresh_city_data", return_value={"errors": [], "message": "ok"}):
+                    response = app.test_client().post(
+                        "/city/refresh/start",
+                        data={
+                            "slug": "cn-440300",
+                            "name": "深圳",
+                            "latitude": "22.546054",
+                            "longitude": "114.025974",
+                            "province": "广东省",
+                            "country": "中国",
+                            "date": "2026-05-31",
+                            **DEFAULT_PREFERENCES,
+                        },
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    job_id = response.get_json()["job_id"]
+                    captured["target"]()
+                    events = list(job_store.listen(job_id, timeout=0.01))
+
+                self.assertEqual(events[-1]["status"], "done")
+                self.assertIn("/city/cn-440300", events[-1]["redirect_url"])
+                self.assertNotIn("Working outside", events[-1]["message"])
+            finally:
+                database.DB_PATH = original_db_path
+
     def test_delete_city_route_removes_custom_city(self) -> None:
         original_db_path = database.DB_PATH
         with tempfile.TemporaryDirectory() as temp_dir:
