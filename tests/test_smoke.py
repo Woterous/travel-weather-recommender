@@ -95,6 +95,15 @@ class AqiIntegrationTest(unittest.TestCase):
         self.assertIn("aqi", weights)
         self.assertAlmostEqual(sum(weights.values()), 1.0)
 
+    def test_scoring_accepts_nan_wind_level(self) -> None:
+        import math
+
+        from service.scoring import score_wind
+
+        score = score_wind({"wind_level": math.nan, "wind_speed_kmh": math.nan}, "medium", "general")
+
+        self.assertEqual(score, 100.0)
+
 
 class SearchAndModelTest(unittest.TestCase):
     def test_city_payload_builds_dynamic_city(self) -> None:
