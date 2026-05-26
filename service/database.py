@@ -248,7 +248,7 @@ class WeatherRepository:
     def get_added_cities(self) -> list[dict]:
         df = self._read_df(
             """
-            SELECT slug, name, province, country, added_time
+            SELECT slug, name, pinyin, latitude, longitude, province, country, added_time
             FROM added_cities
             ORDER BY added_time DESC
             """

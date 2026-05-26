@@ -417,6 +417,39 @@ class RefreshProgressTest(unittest.TestCase):
         self.assertIn("Open-Meteo API 兜底", result["message"])
         self.assertNotIn("HTTPSConnectionPool", result["message"])
 
+    def test_refresh_all_data_includes_added_cities(self) -> None:
+        default_city = CityConfig("beijing", "北京", "beijing", 39.9042, 116.4074)
+        added_city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                repo.add_city_record(added_city, province="广东", country="中国")
+
+                calls = []
+
+                def fake_forecast_api(city, client=None):
+                    calls.append(city.slug)
+                    return {"records": []}
+
+                with mock.patch.object(pipeline, "CITIES", [default_city]), \
+                    mock.patch.object(pipeline, "to_iso_timestamp", return_value="2026-05-24T16:00:00"), \
+                    mock.patch.object(pipeline, "fetch_forecast_page", return_value={"records": []}), \
+                    mock.patch.object(pipeline, "fetch_forecast_api", side_effect=fake_forecast_api), \
+                    mock.patch.object(pipeline, "fetch_air_quality_api", return_value={"records": []}), \
+                    mock.patch.object(pipeline, "_history_cache_is_current", return_value=True), \
+                    mock.patch.object(pipeline, "_save_json"), \
+                    mock.patch.object(pipeline, "save_processed_artifacts"), \
+                    mock.patch.object(pipeline, "write_dataframe"), \
+                    mock.patch.object(pipeline, "write_city_dataframe"), \
+                    mock.patch.object(pipeline, "log_refresh"):
+                    pipeline.refresh_all_data()
+
+                self.assertEqual(calls, ["beijing", "geo-1809858"])
+            finally:
+                database.DB_PATH = original_db_path
+
     def test_refresh_message_hides_raw_client_error_url(self) -> None:
         raw_message = (
             "未来天气 70 条，AQI 50 条，历史月度统计 576 条，历史日样本 17514 条。 "

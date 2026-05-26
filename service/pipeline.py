@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from config.cities import CITIES
+from config.cities import CITIES, CityConfig
 from config.sources import default_history_range
 from crawler.air_quality_crawler import fetch_air_quality_api
 from crawler.fetcher import HttpClient
@@ -49,6 +49,31 @@ def _history_cache_is_current(repository: WeatherRepository, city_slug: str) -> 
     return coverage["row_count"] > 0 and str(coverage["end_date"] or "") >= end_date.isoformat()
 
 
+def _refresh_city_list(repository: WeatherRepository) -> list[CityConfig]:
+    cities = list(CITIES)
+    seen_slugs = {city.slug for city in cities}
+    for item in repository.get_added_cities():
+        slug = str(item.get("slug") or "").strip()
+        if not slug or slug in seen_slugs:
+            continue
+        try:
+            latitude = float(item["latitude"])
+            longitude = float(item["longitude"])
+        except (TypeError, ValueError):
+            continue
+        cities.append(
+            CityConfig(
+                slug=slug,
+                name=str(item.get("name") or slug),
+                pinyin=str(item.get("pinyin") or slug),
+                latitude=latitude,
+                longitude=longitude,
+            )
+        )
+        seen_slugs.add(slug)
+    return cities
+
+
 def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     crawl_time = to_iso_timestamp()     ##生成一次抓取时间 crawl_time
     client = HttpClient()
@@ -60,7 +85,8 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
     warnings = []
     skipped_history_cities = []
     repository = WeatherRepository()
-    total_steps = len(CITIES) * 4 + 5
+    refresh_cities = _refresh_city_list(repository)
+    total_steps = len(refresh_cities) * 4 + 5
     step = 0
 
     _emit_progress(
@@ -70,10 +96,10 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
         total=total_steps,
         stage="准备刷新",
         message="正在初始化 HTTP 客户端和本次抓取时间。",
-        next_step=f"下一步：抓取 {CITIES[0].name} 的未来天气网页。",
+        next_step=f"下一步：抓取 {refresh_cities[0].name} 的未来天气网页。" if refresh_cities else "下一步：清洗本地数据。",
     )
 
-    for city in CITIES:     ##遍历配置里的所有城市，对每个城市分别抓三类数据
+    for city in refresh_cities:     ##遍历默认城市和用户添加城市，对每个城市分别抓三类数据
         _emit_progress(
             progress_callback,
             status="running",
@@ -192,10 +218,10 @@ def refresh_all_data(progress_callback=None) -> dict:     ##开始刷新数据
                 errors.append(_friendly_fetch_error("历史数据", city.name, exc))
 
         step += 1
-        next_city_index = CITIES.index(city) + 1
+        next_city_index = refresh_cities.index(city) + 1
         next_step = (
-            f"下一步：抓取 {CITIES[next_city_index].name} 的未来天气网页。"
-            if next_city_index < len(CITIES)
+            f"下一步：抓取 {refresh_cities[next_city_index].name} 的未来天气网页。"
+            if next_city_index < len(refresh_cities)
             else "下一步：清洗未来天气、AQI 和历史天气数据。"
         )
         _emit_progress(
