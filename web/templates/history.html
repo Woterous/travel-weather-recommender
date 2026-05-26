@@ -17,21 +17,21 @@
             <a class="button button-ghost" href="{{ url_for('home') }}?{{ query_with(preferences) }}">返回首页</a>
         </div>
     </div>
-    <form method="get" action="{{ url_for('history_page') }}" class="card filter-form">
+    <form method="get" action="{{ url_for('history_page') }}" class="card filter-form" data-auto-submit-form>
         <label>城市</label>
-        <select name="city">
+        <select name="city" aria-label="城市">
             {% for item in cities %}
                 <option value="{{ item.slug }}" {% if item.slug == city.slug %}selected{% endif %}>{{ item.name }}</option>
             {% endfor %}
         </select>
         <label>月份</label>
-        <select name="month">
+        <select name="month" aria-label="月份">
             {% for month in month_options %}
                 <option value="{{ month }}" {% if month == selected_month %}selected{% endif %}>{{ month }} 月</option>
             {% endfor %}
         </select>
         <label>城市排名依据</label>
-        <select name="metric">
+        <select name="metric" aria-label="城市排名依据">
             <option value="suitability" {% if metric == 'suitability' %}selected{% endif %}>历史适宜度</option>
             <option value="rainy_ratio" {% if metric == 'rainy_ratio' %}selected{% endif %}>雨天频率</option>
             <option value="comfortable_ratio" {% if metric == 'comfortable_ratio' %}selected{% endif %}>舒适温度占比</option>
@@ -41,7 +41,6 @@
         {% for key, value in preferences.items() %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endfor %}
-        <button type="submit" class="button">查看历史分析</button>
     </form>
 </section>
 

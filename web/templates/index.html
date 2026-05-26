@@ -178,9 +178,12 @@
     </div>
 
     <div class="controls-grid home-controls-grid">
-        <form method="get" action="{{ url_for('home') }}" class="card filter-form">
-            <h3>选择日期</h3>
-            <select name="date">
+        <form id="date-controls" method="get" action="{{ url_for('home') }}" class="card filter-form home-date-card" data-auto-submit-form>
+            <div class="date-card-head">
+                <span>Travel Date</span>
+                <h3>选择日期</h3>
+            </div>
+            <select name="date" aria-label="选择日期">
                 {% for date_item in available_dates %}
                     <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
                 {% endfor %}
@@ -188,7 +191,6 @@
             {% for key, value in preferences.items() %}
                 <input type="hidden" name="{{ key }}" value="{{ value }}">
             {% endfor %}
-            <button type="submit" class="button">更新推荐</button>
         </form>
 
         <div class="card">
@@ -202,27 +204,6 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="section-head">
-            <h3>权重预览</h3>
-            <span class="muted">当前偏好下的评分口径</span>
-        </div>
-        <div class="status-strip">
-            {% for key, value in weights_preview.items() %}
-                <div class="metric-tile">
-                    <span>
-                        {% if key == "temperature" %}温度舒适度{% endif %}
-                        {% if key == "rain" %}降雨风险{% endif %}
-                        {% if key == "wind" %}风力舒适度{% endif %}
-                        {% if key == "weather" %}天气类型{% endif %}
-                        {% if key == "history" %}历史稳定性{% endif %}
-                        {% if key == "aqi" %}AQI{% endif %}
-                    </span>
-                    <strong>{{ "%.2f"|format(value) }}</strong>
-                </div>
-            {% endfor %}
-        </div>
-    </div>
 </section>
 
 {% if ranking %}

@@ -535,6 +535,173 @@ function initPreferenceSliders() {
 
 document.addEventListener("DOMContentLoaded", initPreferenceSliders);
 
+function initCustomSelect(select) {
+    if (!select || select.dataset.customSelectReady === "1") return;
+
+    const wrapper = document.createElement("div");
+    const button = document.createElement("button");
+    const valueNode = document.createElement("span");
+    const menu = document.createElement("div");
+    const selectId = select.id || select.name || "select";
+    const menuId = `custom-${selectId}-${Math.random().toString(36).slice(2)}`;
+
+    wrapper.className = "custom-select";
+    button.type = "button";
+    button.className = "custom-select-button";
+    button.setAttribute("aria-haspopup", "listbox");
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-label", select.getAttribute("aria-label") || select.name || "选择");
+    valueNode.className = "custom-select-value";
+    menu.className = "custom-select-menu";
+    menu.id = menuId;
+    menu.setAttribute("role", "listbox");
+    menu.hidden = true;
+
+    function selectedOption() {
+        return select.options[select.selectedIndex] || select.options[0];
+    }
+
+    function closeMenu() {
+        wrapper.classList.remove("open");
+        const hostForm = select.closest("form");
+        const hostSection = select.closest(".product-section, .hero-panel");
+        if (hostForm) hostForm.classList.remove("select-open");
+        if (hostSection) hostSection.classList.remove("select-layer-active");
+        button.setAttribute("aria-expanded", "false");
+        menu.hidden = true;
+    }
+
+    function openMenu() {
+        document.querySelectorAll(".custom-select.open").forEach((node) => {
+            if (node !== wrapper) {
+                node.classList.remove("open");
+                const openForm = node.closest("form");
+                const openSection = node.closest(".product-section, .hero-panel");
+                if (openForm) openForm.classList.remove("select-open");
+                if (openSection) openSection.classList.remove("select-layer-active");
+                const openButton = node.querySelector(".custom-select-button");
+                const openMenuNode = node.querySelector(".custom-select-menu");
+                if (openButton) openButton.setAttribute("aria-expanded", "false");
+                if (openMenuNode) openMenuNode.hidden = true;
+            }
+        });
+        const hostForm = select.closest("form");
+        const hostSection = select.closest(".product-section, .hero-panel");
+        if (hostForm) hostForm.classList.add("select-open");
+        if (hostSection) hostSection.classList.add("select-layer-active");
+        wrapper.classList.add("open");
+        button.setAttribute("aria-expanded", "true");
+        menu.hidden = false;
+        const active = menu.querySelector(".selected");
+        if (active) active.focus({ preventScroll: true });
+    }
+
+    function syncButton() {
+        const option = selectedOption();
+        valueNode.textContent = option ? option.textContent : "";
+        menu.querySelectorAll(".custom-select-option").forEach((item) => {
+            const isSelected = item.dataset.value === select.value;
+            item.classList.toggle("selected", isSelected);
+            item.setAttribute("aria-selected", String(isSelected));
+        });
+    }
+
+    Array.from(select.options).forEach((option) => {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "custom-select-option";
+        item.dataset.value = option.value;
+        item.textContent = option.textContent;
+        item.setAttribute("role", "option");
+        item.addEventListener("click", () => {
+            if (select.value !== option.value) {
+                select.value = option.value;
+                syncButton();
+                select.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+            closeMenu();
+            button.focus({ preventScroll: true });
+        });
+        menu.appendChild(item);
+    });
+
+    button.appendChild(valueNode);
+    wrapper.append(button, menu);
+    select.classList.add("custom-select-source");
+    select.dataset.customSelectReady = "1";
+    select.insertAdjacentElement("afterend", wrapper);
+    syncButton();
+
+    button.addEventListener("click", () => {
+        if (wrapper.classList.contains("open")) {
+            closeMenu();
+        } else {
+            openMenu();
+        }
+    });
+
+    button.addEventListener("keydown", (event) => {
+        if (["ArrowDown", "Enter", " "].includes(event.key)) {
+            event.preventDefault();
+            openMenu();
+        }
+    });
+
+    menu.addEventListener("keydown", (event) => {
+        const items = Array.from(menu.querySelectorAll(".custom-select-option"));
+        const index = items.indexOf(document.activeElement);
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeMenu();
+            button.focus({ preventScroll: true });
+        }
+        if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+            event.preventDefault();
+            const direction = event.key === "ArrowDown" ? 1 : -1;
+            const next = items[(Math.max(index, 0) + direction + items.length) % items.length];
+            if (next) next.focus({ preventScroll: true });
+        }
+        if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            if (document.activeElement) document.activeElement.click();
+        }
+    });
+
+    document.addEventListener("click", (event) => {
+        if (!wrapper.contains(event.target)) {
+            closeMenu();
+        }
+    });
+}
+
+function initAutoSubmitSelects() {
+    const forms = document.querySelectorAll("[data-auto-submit-form]");
+    forms.forEach((form) => {
+        const selects = form.querySelectorAll("select");
+        if (!selects.length) return;
+
+        selects.forEach((select) => {
+            initCustomSelect(select);
+            select.dataset.previousValue = select.value;
+            select.addEventListener("change", () => {
+                if (form.classList.contains("is-submitting") || select.value === select.dataset.previousValue) {
+                    return;
+                }
+                select.dataset.previousValue = select.value;
+                form.classList.add("is-submitting");
+                form.setAttribute("aria-busy", "true");
+                if (typeof form.requestSubmit === "function") {
+                    form.requestSubmit();
+                    return;
+                }
+                form.submit();
+            });
+        });
+    });
+}
+
+document.addEventListener("DOMContentLoaded", initAutoSubmitSelects);
+
 function initScrollExperience() {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const sections = document.querySelectorAll(".main-content > section, .main-content > div");
