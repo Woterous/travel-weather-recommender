@@ -166,7 +166,7 @@
         <p class="section-lead">保留所有筛选能力，但把后台式面板整理成更轻的判断依据。</p>
     </div>
 
-    <div class="controls-grid">
+    <div class="controls-grid home-controls-grid">
         <form method="get" action="{{ url_for('home') }}" class="card filter-form">
             <h3>选择日期</h3>
             <select name="date">
@@ -181,20 +181,6 @@
         </form>
 
         <div class="card">
-            <h3>当前偏好</h3>
-            <ul class="tag-list">
-                <li>{{ preference_label("rain_sensitivity", preferences["rain_sensitivity"]) }}</li>
-                <li>{{ preference_label("temperature_preference", preferences["temperature_preference"]) }}</li>
-                <li>{{ preference_label("wind_sensitivity", preferences["wind_sensitivity"]) }}</li>
-                <li>{{ preference_label("travel_style", preferences["travel_style"]) }}</li>
-                {% if aqi_available %}
-                <li>{{ preference_label("aqi_sensitivity", preferences["aqi_sensitivity"]) }}</li>
-                {% endif %}
-            </ul>
-            <a class="button button-ghost" href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date) }}">调整偏好</a>
-        </div>
-
-        <div class="card">
             <h3>模型状态</h3>
             <ul class="weight-list">
                 <li><span>模型</span><strong>{{ model_summary.name }}</strong></li>
@@ -207,7 +193,7 @@
 
     <div class="card">
         <div class="section-head">
-            <h3>论文权重预览</h3>
+            <h3>权重预览</h3>
             <span class="muted">当前偏好下的评分口径</span>
         </div>
         <div class="status-strip">
@@ -355,9 +341,13 @@
             <p class="muted">API规则分 {{ row.rule_score }} · 预测天气评分 {{ row.ml_score if row.ml_score is not none else "-" }} · 置信度 {{ "%.0f%%"|format(row.ml_confidence * 100) }}</p>
             <div class="city-card-foot">
                 <strong class="score-big">{{ row.score_total }}</strong>
-                <div class="card-actions">
-                    <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.city_slug) }}?{{ query_with(preferences, date=selected_date) }}">查看详情</a>
-                    <a class="button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b='beijing' if row.city_slug != 'beijing' else 'shanghai') }}">加入对比</a>
+                <div class="card-actions icon-actions">
+                    <a class="icon-button" href="{{ url_for('city_detail', city_slug=row.city_slug) }}?{{ query_with(preferences, date=selected_date) }}" aria-label="查看详情" title="查看详情">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                    </a>
+                    <a class="icon-button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b='beijing' if row.city_slug != 'beijing' else 'shanghai') }}" aria-label="加入对比" title="加入对比">
+                        <span aria-hidden="true">VS</span>
+                    </a>
                     {% if row.is_custom %}
                     <form method="post" action="{{ url_for('delete_city') }}" class="inline-delete-form" onsubmit="return confirm('确定从城市库删除 {{ row.city_name }} 吗？');">
                         <input type="hidden" name="slug" value="{{ row.city_slug }}">
@@ -366,7 +356,9 @@
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
                         <input type="hidden" name="date" value="{{ selected_date }}">
-                        <button type="submit" class="button button-danger">删除</button>
+                        <button type="submit" class="icon-button icon-button-danger" aria-label="删除" title="删除">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="m19 6-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg>
+                        </button>
                     </form>
                     {% endif %}
                 </div>
@@ -380,8 +372,10 @@
             {% endif %}
             <div class="city-card-foot">
                 <strong class="score-big">-</strong>
-                <div class="card-actions">
-                    <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.slug) }}?{{ query_with(preferences, date=row.available_date or selected_date) }}">查看详情</a>
+                <div class="card-actions icon-actions">
+                    <a class="icon-button" href="{{ url_for('city_detail', city_slug=row.slug) }}?{{ query_with(preferences, date=row.available_date or selected_date) }}" aria-label="查看详情" title="查看详情">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+                    </a>
                     {% if row.is_custom %}
                     <form method="post" action="{{ url_for('delete_city') }}" class="inline-delete-form" onsubmit="return confirm('确定从城市库删除 {{ row.name }} 吗？');">
                         <input type="hidden" name="slug" value="{{ row.slug }}">
@@ -390,7 +384,9 @@
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
                         <input type="hidden" name="date" value="{{ selected_date }}">
-                        <button type="submit" class="button button-danger">删除</button>
+                        <button type="submit" class="icon-button icon-button-danger" aria-label="删除" title="删除">
+                            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="m19 6-1 14H6L5 6"></path><path d="M10 11v5"></path><path d="M14 11v5"></path></svg>
+                        </button>
                     </form>
                     {% endif %}
                 </div>

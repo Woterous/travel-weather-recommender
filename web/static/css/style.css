@@ -175,7 +175,7 @@ select {
 .hero-panel,
 .product-hero {
     position: relative;
-    min-height: min(760px, calc(100vh - 128px));
+    min-height: min(680px, calc(100vh - 128px));
     display: grid;
     grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
     gap: 34px;
@@ -251,7 +251,7 @@ select {
 
 .hero-visual {
     position: relative;
-    min-height: 520px;
+    min-height: 480px;
     overflow: hidden;
     border-radius: 42px;
     background:
@@ -410,8 +410,8 @@ select {
 }
 
 .search-stage {
-    min-height: 620px;
-    align-content: center;
+    min-height: 0;
+    align-content: start;
 }
 
 .search-hero {
@@ -913,6 +913,10 @@ input[type="text"]:focus {
     grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.home-controls-grid {
+    grid-template-columns: minmax(280px, 0.7fr) minmax(360px, 1.3fr);
+}
+
 .content-grid,
 .two-column,
 .recommendation-grid {
@@ -1124,6 +1128,60 @@ input[type="text"]:focus {
     display: flex;
     flex-wrap: wrap;
     gap: 8px;
+}
+
+.icon-actions {
+    justify-content: flex-end;
+    gap: 10px;
+}
+
+.icon-button {
+    width: 44px;
+    height: 44px;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid var(--line);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.72);
+    color: #17202c;
+    cursor: pointer;
+    font-weight: 820;
+    line-height: 1;
+    box-shadow: 0 8px 20px rgba(18, 27, 38, 0.06);
+    transition: transform 180ms var(--ease), background 180ms var(--ease), box-shadow 180ms var(--ease), border-color 180ms var(--ease);
+}
+
+.icon-button:hover {
+    transform: translateY(-2px);
+    border-color: rgba(11, 108, 255, 0.22);
+    background: rgba(255, 255, 255, 0.95);
+    box-shadow: 0 14px 32px rgba(18, 27, 38, 0.12);
+}
+
+.icon-button svg {
+    width: 20px;
+    height: 20px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.icon-button span {
+    font-size: 0.78rem;
+    letter-spacing: 0;
+}
+
+.icon-button-danger {
+    color: var(--danger);
+    border-color: rgba(199, 67, 67, 0.24);
+    background: rgba(199, 67, 67, 0.08);
+}
+
+.icon-button-danger:hover {
+    border-color: rgba(199, 67, 67, 0.32);
+    background: rgba(199, 67, 67, 0.12);
 }
 
 .weather-line {
