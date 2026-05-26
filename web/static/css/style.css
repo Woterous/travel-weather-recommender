@@ -383,7 +383,7 @@ select {
 
 .status-item,
 .metric-tile,
-.added-city-row a,
+.history-city-chip,
 .tag-list li {
     border: 1px solid var(--line);
     border-radius: 999px;
@@ -525,18 +525,54 @@ select {
 }
 
 .city-name-list form,
+.history-city-chip form,
+.inline-action-form,
 .inline-delete-form {
     margin: 0;
 }
 
 .city-name-list button,
-.added-city-row a {
+.history-city-chip {
     padding: 10px 14px;
     border: 1px solid var(--line);
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.74);
     color: var(--brand-strong);
     cursor: pointer;
+}
+
+.history-city-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 14px;
+}
+
+.history-city-chip a {
+    color: var(--brand-strong);
+    font-weight: 680;
+}
+
+.history-city-delete {
+    width: 24px;
+    height: 24px;
+    display: inline-grid;
+    place-items: center;
+    border: 0;
+    border-radius: 50%;
+    background: rgba(17, 19, 23, 0.08);
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 1rem;
+    line-height: 1;
+    transition: background 180ms var(--ease), color 180ms var(--ease);
+}
+
+.history-city-delete:hover,
+.history-city-delete:focus {
+    background: rgba(220, 58, 58, 0.12);
+    color: #b42323;
+    outline: none;
 }
 
 .city-name-list button {
