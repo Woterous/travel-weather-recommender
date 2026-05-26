@@ -209,6 +209,7 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "preference.html",
             preferences=preferences,
+            default_preferences=DEFAULT_PREFERENCES,
             selected_date=request.args.get("date") or "",
             latest_refresh=repository.get_latest_refresh_info(),
             aqi_available=repository.aqi_available(),
@@ -307,7 +308,7 @@ def register_routes(app: Flask) -> None:
     @app.post("/refresh/start")
     def refresh_start():
         preferences = normalize_preferences(request.form or request.args)
-        redirect_url = url_for("home") + "?" + _query_string(preferences)
+        home_path = url_for("home")
         job_id = refresh_jobs.create()
 
         def run_refresh() -> None:
@@ -316,7 +317,7 @@ def register_routes(app: Flask) -> None:
 
             try:
                 result = refresh_all_data(progress_callback=emit)
-                final_redirect_url = url_for("home") + "?" + _query_string(preferences, {"date": _preferred_repository_forecast_date(WeatherRepository())})
+                final_redirect_url = home_path + "?" + _query_string(preferences, {"date": _preferred_repository_forecast_date(WeatherRepository())})
                 refresh_jobs.emit(
                     job_id,
                     {
@@ -376,6 +377,7 @@ def register_routes(app: Flask) -> None:
         city = city_from_search_payload(request.form)
         province = request.form.get("province", "")
         country = request.form.get("country", "")
+        city_detail_path = url_for("city_detail", city_slug=city.slug)
         job_id = refresh_jobs.create()
 
         def run_refresh() -> None:
@@ -386,7 +388,7 @@ def register_routes(app: Flask) -> None:
                 repository.add_city_record(city, province=province, country=country)
                 city_dates = repository.get_city_forecast(city.slug)
                 target_date = _preferred_forecast_date(sorted(city_dates["date"].dropna().astype(str).unique())) if not city_dates.empty else ""
-                redirect_url = url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": target_date})
+                redirect_url = city_detail_path + "?" + _query_string(preferences, {"date": target_date})
                 refresh_jobs.emit(
                     job_id,
                     {
