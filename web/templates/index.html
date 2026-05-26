@@ -146,13 +146,13 @@
         </div>
         {% endif %}
 
-        {% if added_cities %}
+        {% if search_history %}
         <div class="added-city-row">
             <span class="muted">搜索历史</span>
-            {% for item in added_cities[:8] %}
+            {% for item in search_history[:8] %}
                 <div class="history-city-chip">
-                    <a href="{{ url_for('city_detail', city_slug=item.slug) }}?{{ query_with(preferences, date=selected_date) }}">{{ item.name }}</a>
-                    <form method="post" action="{{ url_for('delete_city') }}" onsubmit="return confirm('确定删除 {{ item.name }} 吗？');">
+                    <a href="{{ url_for('city_detail', city_slug=item.slug) }}?{{ query_with(preferences, date=selected_date, name=item.name, latitude=item.latitude, longitude=item.longitude, province=item.province, country=item.country) }}">{{ item.name }}</a>
+                    <form method="post" action="{{ url_for('delete_search_history') }}" onsubmit="return confirm('确定删除 {{ item.name }} 的搜索历史吗？');">
                         <input type="hidden" name="slug" value="{{ item.slug }}">
                         <input type="hidden" name="name" value="{{ item.name }}">
                         {% for key, value in preferences.items() %}

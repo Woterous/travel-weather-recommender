@@ -133,6 +133,20 @@ def ensure_database() -> None:
         )
         cursor.execute(
             """
+            CREATE TABLE IF NOT EXISTS search_history (
+                slug TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                pinyin TEXT,
+                latitude REAL,
+                longitude REAL,
+                province TEXT,
+                country TEXT,
+                searched_time TEXT NOT NULL
+            )
+            """
+        )
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS app_state (
                 key TEXT PRIMARY KEY,
                 value TEXT NOT NULL
@@ -292,6 +306,58 @@ class WeatherRepository:
         if df.empty:
             return []
         return df.to_dict("records")
+
+    def add_search_history(self, city, province: str = "", country: str = "") -> None:
+        connection = get_connection()
+        try:
+            connection.execute(
+                """
+                INSERT INTO search_history
+                    (slug, name, pinyin, latitude, longitude, province, country, searched_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(slug) DO UPDATE SET
+                    name = excluded.name,
+                    pinyin = excluded.pinyin,
+                    latitude = excluded.latitude,
+                    longitude = excluded.longitude,
+                    province = excluded.province,
+                    country = excluded.country,
+                    searched_time = excluded.searched_time
+                """,
+                (
+                    city.slug,
+                    city.name,
+                    city.pinyin,
+                    city.latitude,
+                    city.longitude,
+                    province,
+                    country,
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+
+    def get_search_history(self) -> list[dict]:
+        df = self._read_df(
+            """
+            SELECT slug, name, pinyin, latitude, longitude, province, country, searched_time
+            FROM search_history
+            ORDER BY searched_time DESC
+            """
+        )
+        if df.empty:
+            return []
+        return df.to_dict("records")
+
+    def delete_search_history(self, city_slug: str) -> bool:
+        connection = get_connection()
+        try:
+            cursor = connection.execute("DELETE FROM search_history WHERE slug = ?", (city_slug,))
+            connection.commit()
+            return cursor.rowcount > 0
+        finally:
+            connection.close()
 
     def get_city_record(self, city_slug: str) -> dict | None:
         df = self._read_df(
