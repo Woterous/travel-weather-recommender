@@ -28,6 +28,10 @@ html {
     scroll-behavior: smooth;
 }
 
+html.is-route-loading {
+    cursor: progress;
+}
+
 body {
     margin: 0;
     color: var(--ink);
@@ -155,6 +159,13 @@ select {
     display: grid;
     gap: 78px;
     margin-top: 38px;
+    transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+}
+
+.main-content.is-route-loading {
+    opacity: 0.46;
+    pointer-events: none;
+    transform: translateY(6px);
 }
 
 .page-transition {
