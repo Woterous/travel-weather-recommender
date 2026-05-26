@@ -285,6 +285,17 @@
             <div class="card-actions">
                 <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.city_slug) }}?{{ query_with(preferences, date=selected_date) }}">查看详情</a>
                 <a class="button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b='beijing' if row.city_slug != 'beijing' else 'shanghai') }}">加入对比</a>
+                {% if row.is_custom %}
+                <form method="post" action="{{ url_for('delete_city') }}" class="inline-delete-form" onsubmit="return confirm('确定从城市库删除 {{ row.city_name }} 吗？');">
+                    <input type="hidden" name="slug" value="{{ row.city_slug }}">
+                    <input type="hidden" name="name" value="{{ row.city_name }}">
+                    {% for key, value in preferences.items() %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                    <input type="hidden" name="date" value="{{ selected_date }}">
+                    <button type="submit" class="button button-danger">删除</button>
+                </form>
+                {% endif %}
             </div>
         </div>
         {% else %}
@@ -294,6 +305,17 @@
             <strong class="score-big">-</strong>
             <div class="card-actions">
                 <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.slug) }}?{{ query_with(preferences, date=selected_date) }}">查看详情</a>
+                {% if row.is_custom %}
+                <form method="post" action="{{ url_for('delete_city') }}" class="inline-delete-form" onsubmit="return confirm('确定从城市库删除 {{ row.name }} 吗？');">
+                    <input type="hidden" name="slug" value="{{ row.slug }}">
+                    <input type="hidden" name="name" value="{{ row.name }}">
+                    {% for key, value in preferences.items() %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                    <input type="hidden" name="date" value="{{ selected_date }}">
+                    <button type="submit" class="button button-danger">删除</button>
+                </form>
+                {% endif %}
             </div>
         </div>
         {% endif %}

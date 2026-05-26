@@ -257,6 +257,19 @@ class WeatherRepository:
             return []
         return df.to_dict("records")
 
+    def delete_added_city(self, city_slug: str, purge_cached_data: bool = True) -> bool:
+        connection = get_connection()
+        try:
+            cursor = connection.execute("DELETE FROM added_cities WHERE slug = ?", (city_slug,))
+            deleted = cursor.rowcount > 0
+            if deleted and purge_cached_data:
+                for table_name in ["forecast_daily", "history_monthly", "history_daily"]:
+                    connection.execute(f"DELETE FROM {table_name} WHERE city_slug = ?", (city_slug,))
+            connection.commit()
+            return deleted
+        finally:
+            connection.close()
+
     def get_city_meta(self, city_slug: str) -> dict | None:
         df = self._read_df(
             """

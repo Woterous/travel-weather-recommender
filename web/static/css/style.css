@@ -345,6 +345,16 @@ input[type="text"] {
     background: transparent;
 }
 
+.button-danger {
+    border-color: rgba(165, 90, 34, 0.22);
+    background: rgba(165, 90, 34, 0.08);
+    color: var(--warning);
+}
+
+.inline-delete-form {
+    margin: 0;
+}
+
 .section-head {
     display: flex;
     justify-content: space-between;

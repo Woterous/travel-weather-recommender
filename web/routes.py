@@ -313,6 +313,21 @@ def register_routes(app: Flask) -> None:
             flash(f"{city.name} 数据刷新完成。", "success")
         return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": date_text}))
 
+    @app.post("/city/delete")
+    def delete_city():
+        preferences = normalize_preferences(request.form)
+        date_text = request.form.get("date") or request.args.get("date") or ""
+        city_slug = request.form.get("slug", "").strip()
+        city_name = request.form.get("name", "").strip() or "该城市"
+        repository = WeatherRepository()
+        if city_slug in CITY_BY_SLUG:
+            flash("默认城市不能从城市库删除。", "warning")
+        elif repository.delete_added_city(city_slug, purge_cached_data=True):
+            flash(f"{city_name} 已从自定义城市库删除。", "success")
+        else:
+            flash("没有找到需要删除的自定义城市。", "warning")
+        return redirect(url_for("home") + "?" + _query_string(preferences, {"date": date_text}))
+
     @app.get("/api/cities/search")
     def city_search_api():
         query = request.args.get("q", "").strip()

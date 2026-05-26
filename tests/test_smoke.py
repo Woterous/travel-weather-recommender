@@ -125,6 +125,42 @@ class SearchAndModelTest(unittest.TestCase):
             finally:
                 database.DB_PATH = original_db_path
 
+    def test_delete_added_city_removes_record_and_cached_data(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
+                repo.add_city_record(city, province="广东", country="中国")
+                connection = database.get_connection()
+                try:
+                    connection.execute(
+                        "INSERT INTO forecast_daily (city_slug, city_name, date) VALUES (?, ?, ?)",
+                        (city.slug, city.name, "2026-05-24"),
+                    )
+                    connection.execute(
+                        "INSERT INTO history_monthly (city_slug, city_name, month_key, month_num) VALUES (?, ?, ?, ?)",
+                        (city.slug, city.name, "2026-05", 5),
+                    )
+                    connection.execute(
+                        "INSERT INTO history_daily (city_slug, city_name, date) VALUES (?, ?, ?)",
+                        (city.slug, city.name, "2026-05-01"),
+                    )
+                    connection.commit()
+                finally:
+                    connection.close()
+
+                deleted = repo.delete_added_city(city.slug)
+
+                self.assertTrue(deleted)
+                self.assertEqual(repo.get_added_cities(), [])
+                self.assertTrue(repo.get_city_forecast(city.slug).empty)
+                self.assertTrue(repo.get_history_monthly(city.slug).empty)
+                self.assertTrue(repo.get_history_daily(city.slug).empty)
+            finally:
+                database.DB_PATH = original_db_path
+
     def test_homepage_city_catalog_includes_default_and_added_cities(self) -> None:
         original_db_path = database.DB_PATH
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -202,6 +238,35 @@ class SearchAndModelTest(unittest.TestCase):
                 self.assertIn("date=2026-05-24", response.headers["Location"])
             finally:
                 database.DB_PATH = original_db_path
+
+    def test_delete_city_route_removes_custom_city(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
+                repo.add_city_record(city, province="广东", country="中国")
+
+                response = app.test_client().post(
+                    "/city/delete",
+                    data={"slug": city.slug, "name": city.name, "date": "2026-05-24", **DEFAULT_PREFERENCES},
+                )
+
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("date=2026-05-24", response.headers["Location"])
+                self.assertEqual(repo.get_added_cities(), [])
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_delete_city_route_keeps_default_city(self) -> None:
+        response = app.test_client().post(
+            "/city/delete",
+            data={"slug": "beijing", "name": "北京", "date": "2026-05-24", **DEFAULT_PREFERENCES},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("date=2026-05-24", response.headers["Location"])
 
     def test_knn_model_predicts_score(self) -> None:
         import pandas as pd
