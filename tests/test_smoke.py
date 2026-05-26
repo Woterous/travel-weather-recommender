@@ -2,7 +2,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from unittest import mock
 
 
@@ -16,6 +16,7 @@ from config.preferences import DEFAULT_PREFERENCES
 from service.city_search import city_from_search_payload
 from service.city_search import search_cities
 from service.clean_data import build_forecast_dataset, build_history_daily_dataset
+from crawler.forecast_crawler import fetch_forecast_page
 from service.database import _sanitize_refresh_message
 from service import database
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
@@ -539,6 +540,8 @@ class RefreshProgressTest(unittest.TestCase):
             mock.patch.object(pipeline, "fetch_forecast_api", return_value=api_payload), \
             mock.patch.object(pipeline, "fetch_air_quality_api", return_value=aqi_payload), \
             mock.patch.object(pipeline, "fetch_history_daily", return_value=history_payload), \
+            mock.patch.object(pipeline, "_forecast_cache_is_current", return_value=False), \
+            mock.patch.object(pipeline, "_aqi_cache_is_current", return_value=False), \
             mock.patch.object(pipeline, "_history_cache_is_current", return_value=False), \
             mock.patch.object(pipeline, "_save_json"), \
             mock.patch.object(pipeline, "save_processed_artifacts"), \
@@ -606,6 +609,42 @@ class RefreshProgressTest(unittest.TestCase):
 
         self.assertEqual(message, "历史数据暂时不可用：三亚 请求过于频繁，本次未更新，请稍后重试。")
 
+    def test_friendly_fetch_error_identifies_gateway_failure(self) -> None:
+        message = pipeline._friendly_fetch_error(
+            "未来天气补充数据",
+            "广州",
+            RuntimeError("502 Server Error: Bad Gateway for url: https://example.test/raw"),
+        )
+
+        self.assertIn("上游天气服务暂时不可用", message)
+
+    def test_forecast_page_uses_tianqi_alias_for_search_city(self) -> None:
+        class AliasClient:
+            def __init__(self) -> None:
+                self.urls = []
+
+            def get_text(self, url: str) -> str:
+                self.urls.append(url)
+                if "guangzhou" not in url:
+                    raise RuntimeError("not found")
+                return """
+                <div class="day7 hide twty_hour">
+                    <ul class="week"><li><b>05月26日</b></li></ul>
+                    <ul class="txt txt2"><li>晴</li></ul>
+                    <div class="zxt_shuju"><ul><li><span>35</span><b>28</b></li></ul></div>
+                    <ul class="txt"><li>南风</li></ul>
+                </div>
+                """
+
+        city = CityConfig("geo-1809858", "广州", "geo-1809858", 23.11667, 113.25)
+        client = AliasClient()
+
+        payload = fetch_forecast_page(city, client=client)
+
+        self.assertEqual(len(payload["records"]), 1)
+        self.assertTrue(any("guangzhou" in url for url in client.urls))
+        self.assertEqual(payload["records"][0]["weather_detail"], "晴")
+
     def test_history_cache_current_when_covered_to_last_month(self) -> None:
         repository = mock.Mock()
         repository.get_history_daily_coverage.return_value = {
@@ -639,6 +678,120 @@ class RefreshProgressTest(unittest.TestCase):
             is_current = pipeline._history_cache_is_current(repository, "sanya")
 
         self.assertFalse(is_current)
+
+    def test_refresh_city_reuses_current_forecast_and_aqi_cache(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
+                repo.add_city_record(city, province="广东", country="中国")
+                today = date.today()
+                connection = database.get_connection()
+                try:
+                    for offset in range(5):
+                        connection.execute(
+                            """
+                            INSERT INTO forecast_daily
+                                (city_slug, city_name, date, aqi, crawl_time)
+                            VALUES (?, ?, ?, ?, ?)
+                            """,
+                            (
+                                city.slug,
+                                city.name,
+                                (today + timedelta(days=offset)).isoformat(),
+                                50 + offset,
+                                f"{today.isoformat()}T08:00:00",
+                            ),
+                        )
+                    connection.commit()
+                finally:
+                    connection.close()
+
+                with mock.patch.object(pipeline, "fetch_forecast_api") as mocked_forecast, \
+                    mock.patch.object(pipeline, "fetch_air_quality_api") as mocked_aqi, \
+                    mock.patch.object(pipeline, "_history_cache_is_current", return_value=True), \
+                    mock.patch.object(pipeline, "fetch_history_daily"):
+                    result = pipeline.refresh_city_data(city)
+
+                mocked_forecast.assert_not_called()
+                mocked_aqi.assert_not_called()
+                self.assertEqual(result["forecast_rows"], 5)
+                self.assertEqual(result["aqi_rows"], 5)
+                self.assertIn("复用今日缓存", result["message"])
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_refresh_city_keeps_page_forecast_when_api_gateway_fails(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                city = CityConfig("geo-1809858", "广州", "geo-1809858", 23.11667, 113.25)
+                page_payload = {
+                    "records": [
+                        {
+                            "city_slug": city.slug,
+                            "city_name": city.name,
+                            "date": "2026-05-26",
+                            "weather_detail": "晴",
+                            "weather_type": "晴",
+                            "max_temp": 35,
+                            "min_temp": 28,
+                            "avg_temp": 31.5,
+                            "wind_direction": "南风",
+                        }
+                    ]
+                }
+                aqi_payload = {"records": [{"date": "2026-05-26", "aqi": 80}]}
+
+                with mock.patch.object(pipeline, "fetch_forecast_page", return_value=page_payload), \
+                    mock.patch.object(pipeline, "fetch_forecast_api", side_effect=RuntimeError("502 Server Error: Bad Gateway")), \
+                    mock.patch.object(pipeline, "fetch_air_quality_api", return_value=aqi_payload), \
+                    mock.patch.object(pipeline, "_history_cache_is_current", return_value=True), \
+                    mock.patch.object(pipeline, "_save_json"):
+                    result = pipeline.refresh_city_data(city)
+
+                self.assertEqual(result["errors"], [])
+                self.assertEqual(result["forecast_rows"], 1)
+                self.assertEqual(result["aqi_rows"], 1)
+                self.assertFalse(database.WeatherRepository().get_city_forecast(city.slug).empty)
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_prune_data_for_removed_cities_drops_stale_cache(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                connection = database.get_connection()
+                try:
+                    connection.execute(
+                        "INSERT INTO forecast_daily (city_slug, city_name, date) VALUES (?, ?, ?)",
+                        ("geo-removed", "已删城市", "2026-05-24"),
+                    )
+                    connection.execute(
+                        "INSERT INTO history_monthly (city_slug, city_name, month_key, month_num) VALUES (?, ?, ?, ?)",
+                        ("geo-removed", "已删城市", "2026-05", 5),
+                    )
+                    connection.execute(
+                        "INSERT INTO history_daily (city_slug, city_name, date) VALUES (?, ?, ?)",
+                        ("geo-removed", "已删城市", "2026-05-01"),
+                    )
+                    connection.commit()
+                finally:
+                    connection.close()
+
+                deleted = repo.prune_data_for_removed_cities()
+
+                self.assertEqual(deleted, 3)
+                self.assertTrue(repo.get_city_forecast("geo-removed").empty)
+                self.assertTrue(repo.get_history_monthly("geo-removed").empty)
+                self.assertTrue(repo.get_history_daily("geo-removed").empty)
+            finally:
+                database.DB_PATH = original_db_path
 
 
 if __name__ == "__main__":

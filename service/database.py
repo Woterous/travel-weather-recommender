@@ -183,6 +183,16 @@ def write_city_dataframe(df: pd.DataFrame, table_name: str, city_slug: str) -> N
         connection.close()
 
 
+def delete_city_dataframe(table_name: str, city_slug: str) -> None:
+    ensure_database()
+    connection = get_connection()
+    try:
+        connection.execute(f"DELETE FROM {table_name} WHERE city_slug = ?", (city_slug,))
+        connection.commit()
+    finally:
+        connection.close()
+
+
 def log_refresh(refresh_time: str, status: str, message: str) -> None:
     ensure_database()
     connection = get_connection()
@@ -216,6 +226,11 @@ class WeatherRepository:
             "SELECT * FROM forecast_daily WHERE date = ? ORDER BY city_slug",
             (date_text,),
         )
+
+    def get_forecast_daily(self, city_slug: str | None = None) -> pd.DataFrame:
+        if city_slug:
+            return self.get_city_forecast(city_slug)
+        return self._read_df("SELECT * FROM forecast_daily ORDER BY date, city_slug")
 
     def get_city_forecast(self, city_slug: str) -> pd.DataFrame:
         return self._read_df(
@@ -290,6 +305,68 @@ class WeatherRepository:
         if df.empty:
             return None
         return df.iloc[0].to_dict()
+
+    def get_added_city_slugs(self) -> set[str]:
+        df = self._read_df("SELECT slug FROM added_cities")
+        if df.empty:
+            return set()
+        return {str(slug) for slug in df["slug"].dropna().tolist()}
+
+    def prune_data_for_removed_cities(self) -> int:
+        active_slugs = self.get_added_city_slugs()
+        deleted = 0
+        connection = get_connection()
+        try:
+            if not active_slugs:
+                for table_name in ["forecast_daily", "history_monthly", "history_daily"]:
+                    cursor = connection.execute(f"DELETE FROM {table_name}")
+                    deleted += cursor.rowcount
+                connection.commit()
+                return deleted
+
+            placeholders = ",".join("?" for _ in active_slugs)
+            params = tuple(active_slugs)
+            for table_name in ["forecast_daily", "history_monthly", "history_daily"]:
+                cursor = connection.execute(
+                    f"DELETE FROM {table_name} WHERE city_slug NOT IN ({placeholders})",
+                    params,
+                )
+                deleted += cursor.rowcount
+            connection.commit()
+            return deleted
+        finally:
+            connection.close()
+
+    def forecast_cache_is_current(self, city_slug: str, today: str) -> bool:
+        df = self._read_df(
+            """
+            SELECT COUNT(*) AS row_count
+            FROM forecast_daily
+            WHERE city_slug = ?
+              AND date >= ?
+              AND crawl_time >= ?
+            """,
+            (city_slug, today, f"{today}T00:00:00"),
+        )
+        if df.empty:
+            return False
+        return int(df.iloc[0]["row_count"] or 0) >= 5
+
+    def aqi_cache_is_current(self, city_slug: str, today: str) -> bool:
+        df = self._read_df(
+            """
+            SELECT COUNT(*) AS row_count
+            FROM forecast_daily
+            WHERE city_slug = ?
+              AND date >= ?
+              AND crawl_time >= ?
+              AND aqi IS NOT NULL
+            """,
+            (city_slug, today, f"{today}T00:00:00"),
+        )
+        if df.empty:
+            return False
+        return int(df.iloc[0]["row_count"] or 0) >= 5
 
     def delete_city_record(self, city_slug: str, purge_cached_data: bool = True) -> bool:
         connection = get_connection()
