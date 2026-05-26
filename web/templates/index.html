@@ -61,7 +61,10 @@
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
                         <input type="hidden" name="date" value="{{ selected_date }}">
-                        <button type="submit">{{ result.name }}</button>
+                        <button type="submit">
+                            <span>{{ result.name }}</span>
+                            {% if result.display_name %}<small>{{ result.display_name }}</small>{% endif %}
+                        </button>
                     </form>
                     {% endfor %}
                 </div>

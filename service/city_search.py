@@ -1,33 +1,149 @@
 from __future__ import annotations
 
+import csv
 from dataclasses import asdict
+from functools import lru_cache
+from pathlib import Path
 
 from config.cities import CITIES, CITY_BY_SLUG, CityConfig
 from config.sources import build_geocoding_api_url
 from crawler.fetcher import HttpClient
 
 
-CURATED_CITY_SUGGESTIONS = [
-    CityConfig("geo-1792947", "天津", "tianjin", 39.14222, 117.17667),
-    CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25),
-    CityConfig("geo-1811720", "广元", "guangyuan", 32.44201, 105.823),
-    CityConfig("geo-1812256", "广安", "guangan", 30.47413, 106.63696),
-    CityConfig("geo-10179231", "广陵", "guangling", 32.39358, 119.43157),
-    CityConfig("geo-1806466", "广德", "guangde", 30.89371, 119.41705),
-    CityConfig("geo-1799962", "武汉", "wuhan", 30.58333, 114.26667),
-    CityConfig("geo-1791247", "深圳", "shenzhen", 22.54554, 114.0683),
-    CityConfig("geo-1796236", "沈阳", "shenyang", 41.79222, 123.43278),
-    CityConfig("geo-1808722", "哈尔滨", "haerbin", 45.75, 126.65),
-    CityConfig("geo-1816670", "石家庄", "shijiazhuang", 38.04139, 114.47861),
-    CityConfig("geo-1814906", "长沙", "changsha", 28.19874, 112.97087),
-    CityConfig("geo-1795565", "苏州", "suzhou", 31.30408, 120.59538),
-    CityConfig("geo-1815286", "成都", "chengdu", 30.66667, 104.06667),
-    CityConfig("geo-1812545", "大连", "dalian", 38.91222, 121.60222),
-    CityConfig("geo-1805757", "昆明", "kunming", 25.03889, 102.71833),
-    CityConfig("geo-1804651", "拉萨", "lasa", 29.65, 91.1),
-    CityConfig("geo-1808926", "桂林", "guilin", 25.28194, 110.28639),
-    CityConfig("geo-1809461", "贵阳", "guiyang", 26.58333, 106.71667),
+REFERENCE_DIR = Path(__file__).resolve().parent / "reference"
+CHINA_ADMIN_GEOCODES = REFERENCE_DIR / "china_admin_geocodes.csv"
+MUNICIPALITIES = {"北京市", "天津市", "上海市", "重庆市"}
+AUTONOMOUS_REGION_SHORT_NAMES = {
+    "广西壮族自治区": "广西",
+    "内蒙古自治区": "内蒙古",
+    "西藏自治区": "西藏",
+    "宁夏回族自治区": "宁夏",
+    "新疆维吾尔自治区": "新疆",
+}
+PROVINCE_SUFFIXES = ["特别行政区", "自治区", "省", "市"]
+REGION_SUFFIXES = [
+    "特别行政区",
+    "自治区",
+    "自治州",
+    "自治县",
+    "地区",
+    "盟",
+    "省",
+    "市",
+    "区",
+    "县",
+    "旗",
 ]
+
+
+def _short_admin_name(name: str) -> str:
+    for suffix in REGION_SUFFIXES:
+        if name.endswith(suffix) and len(name) > len(suffix):
+            return name[: -len(suffix)]
+    return name
+
+
+def _split_province(full_name: str) -> tuple[str, str]:
+    candidates = []
+    for suffix in PROVINCE_SUFFIXES:
+        marker = full_name.find(suffix)
+        if marker >= 0:
+            candidates.append((marker + len(suffix), suffix))
+    if candidates:
+        if any(suffix == "自治区" for _end, suffix in candidates):
+            end = next(end for end, suffix in candidates if suffix == "自治区")
+        else:
+            end = min(end for end, _suffix in candidates)
+            return full_name[:end], full_name[end:]
+    return "", full_name
+
+
+def _province_aliases(province: str) -> list[str]:
+    aliases = [province]
+    if province in AUTONOMOUS_REGION_SHORT_NAMES:
+        aliases.append(AUTONOMOUS_REGION_SHORT_NAMES[province])
+    for suffix in PROVINCE_SUFFIXES:
+        if province.endswith(suffix):
+            aliases.append(province[: -len(suffix)])
+    return [alias for alias in aliases if alias]
+
+
+def _remove_prefix(text: str, prefixes: list[str]) -> str:
+    for prefix in sorted(prefixes, key=len, reverse=True):
+        if prefix and text.startswith(prefix):
+            return text[len(prefix) :]
+    return text
+
+
+def _local_slug(code: str) -> str:
+    return f"cn-{code}"
+
+
+@lru_cache(maxsize=1)
+def _load_china_admin_index() -> list[dict]:
+    if not CHINA_ADMIN_GEOCODES.exists():
+        return []
+    with CHINA_ADMIN_GEOCODES.open(encoding="utf-8", newline="") as file:
+        rows = list(csv.DictReader(file))
+    by_code = {row["行政代码"]: row for row in rows}
+    index = []
+    for row in rows:
+        code = row["行政代码"].strip()
+        full_name = row["地名"].strip()
+        province_row = by_code.get(f"{code[:2]}0000")
+        province = province_row["地名"].strip() if province_row else _split_province(full_name)[0]
+        if not province:
+            continue
+        province_aliases = _province_aliases(province)
+        city = ""
+        if code[2:] == "0000":
+            name = province
+        elif code[4:] == "00":
+            name = _remove_prefix(full_name, province_aliases)
+            if not name and province in MUNICIPALITIES:
+                name = province
+        else:
+            parent = by_code.get(f"{code[:4]}00")
+            if parent:
+                parent_name = parent["地名"].strip()
+                city = _remove_prefix(parent_name, province_aliases)
+                if not city or city in {"市辖区", "县"}:
+                    city = province
+                if full_name.startswith(parent_name):
+                    name = full_name[len(parent_name) :]
+                else:
+                    name = _remove_prefix(full_name, province_aliases)
+            elif province in MUNICIPALITIES:
+                city = province
+                name = _remove_prefix(full_name, province_aliases)
+            else:
+                name = _remove_prefix(full_name, province_aliases)
+        if city and name.startswith(city) and name != city:
+            name = name[len(city) :]
+        if name in {"市辖区", "市辖", "县"}:
+            continue
+        hierarchy = ["中国", province]
+        if city and city != province:
+            hierarchy.append(city)
+        if name and name not in {province, city}:
+            hierarchy.append(name)
+        short_name = AUTONOMOUS_REGION_SHORT_NAMES.get(name, _short_admin_name(name))
+        display_name = "·".join(hierarchy)
+        index.append(
+            {
+                "slug": _local_slug(code),
+                "name": short_name,
+                "pinyin": code,
+                "latitude": float(row["北纬"]),
+                "longitude": float(row["东经"]),
+                "province": province,
+                "country": "中国",
+                "source": "local admin geocodes",
+                "display_name": display_name,
+                "search_text": f"{full_name} {display_name} {short_name} {code}".lower(),
+            }
+        )
+    return index
 
 
 def _city_to_search_result(city: CityConfig, province: str, source: str, country: str = "中国") -> dict:
@@ -36,18 +152,18 @@ def _city_to_search_result(city: CityConfig, province: str, source: str, country
         "province": province,
         "country": country,
         "source": source,
-        "display_name": " · ".join(part for part in [city.name, province, country] if part),
+        "display_name": "·".join(part for part in [country, province, city.name] if part),
     }
 
 
 def _dedupe_city_results(results: list[dict]) -> list[dict]:
     deduped = []
-    seen_names = set()
+    seen_keys = set()
     for item in results:
-        key = str(item.get("name", "")).strip().lower()
-        if not key or key in seen_names:
+        key = str(item.get("slug") or item.get("display_name") or item.get("name") or "").strip().lower()
+        if not key or key in seen_keys:
             continue
-        seen_names.add(key)
+        seen_keys.add(key)
         deduped.append(item)
     return deduped
 
@@ -75,19 +191,23 @@ def search_cities(query: str, client: HttpClient | None = None, include_remote: 
     cleaned = query.strip()
     if not cleaned:
         return []
+    lowered = cleaned.lower()
 
     fixed_matches = [
         _city_to_search_result(city, province="内置城市", source="local")
         for city in CITIES
-        if cleaned.lower() in city.name.lower() or cleaned.lower() in city.pinyin.lower()
+        if lowered in city.name.lower() or lowered in city.pinyin.lower()
     ]
-    curated_matches = [
-        _city_to_search_result(city, province="联想城市", source="local suggestion")
-        for city in CURATED_CITY_SUGGESTIONS
-        if cleaned.lower() in city.name.lower() or cleaned.lower() in city.pinyin.lower()
-    ]
+    admin_matches = [item for item in _load_china_admin_index() if lowered in item["search_text"]]
+    admin_matches.sort(
+        key=lambda item: (
+            0 if item["name"] == cleaned else 1 if item["name"].startswith(cleaned) else 2,
+            len(item["display_name"]),
+            item["display_name"],
+        )
+    )
 
-    local_matches = fixed_matches + curated_matches
+    local_matches = fixed_matches + admin_matches
     has_exact_local_match = any(item["name"].lower() == cleaned.lower() for item in local_matches)
     should_search_remote = include_remote and len(cleaned) > 1 and not has_exact_local_match
 
@@ -99,7 +219,7 @@ def search_cities(query: str, client: HttpClient | None = None, include_remote: 
         except Exception:
             payload = {"results": []}
     remote_matches = []
-    seen_slugs = {item["slug"] for item in fixed_matches + curated_matches}
+    seen_slugs = {item["slug"] for item in local_matches}
     for record in payload.get("results", []) or []:
         if "latitude" not in record or "longitude" not in record:
             continue
@@ -115,11 +235,11 @@ def search_cities(query: str, client: HttpClient | None = None, include_remote: 
                 "province": province,
                 "country": country,
                 "source": "open-meteo geocoding",
-                "display_name": " · ".join(part for part in [city.name, province, country] if part),
+                "display_name": "·".join(part for part in [country, province, city.name] if part),
             }
         )
 
-    return _dedupe_city_results(local_matches + remote_matches)[:8]
+    return _dedupe_city_results(local_matches + remote_matches)[:15]
 
 
 def city_from_search_payload(payload: dict) -> CityConfig:

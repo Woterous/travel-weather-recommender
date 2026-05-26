@@ -193,7 +193,7 @@ class SearchAndModelTest(unittest.TestCase):
                 _build_homepage_context_cached.cache_clear()
                 database.DB_PATH = original_db_path
 
-    def test_city_search_suggests_curated_matches_for_single_character(self) -> None:
+    def test_city_search_suggests_local_admin_matches_for_single_character(self) -> None:
         class FailingClient:
             def get_json(self, _url):
                 raise RuntimeError("network unavailable")
@@ -204,6 +204,18 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertIn("广州", names)
         self.assertIn("广陵", names)
 
+    def test_city_search_shows_hierarchical_location_for_counties(self) -> None:
+        results = search_cities("玉田", include_remote=False)
+        yutian = next(item for item in results if item["name"] == "玉田")
+
+        self.assertEqual(yutian["display_name"], "中国·河北省·唐山市·玉田县")
+
+    def test_city_search_keeps_same_name_places_separate_by_location(self) -> None:
+        results = search_cities("鼓楼", include_remote=False)
+        locations = {item["display_name"] for item in results if item["name"] == "鼓楼"}
+
+        self.assertGreaterEqual(len(locations), 2)
+
     def test_city_search_can_skip_remote_lookup_for_suggestions(self) -> None:
         class FailingClient:
             def get_json(self, _url):
@@ -212,6 +224,7 @@ class SearchAndModelTest(unittest.TestCase):
         results = search_cities("广陵", client=FailingClient(), include_remote=False)
 
         self.assertEqual(results[0]["name"], "广陵")
+        self.assertIn("江苏省·扬州市·广陵区", results[0]["display_name"])
 
     def test_city_search_api_returns_json_results(self) -> None:
         with mock.patch("web.routes.search_cities", return_value=[{"name": "广州", "slug": "geo-1809858"}]):

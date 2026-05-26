@@ -229,7 +229,13 @@ function initCitySuggestions() {
         results.forEach((city) => {
             const button = document.createElement("button");
             button.type = "button";
-            button.textContent = city.name;
+            const name = document.createElement("span");
+            name.className = "city-suggest-name";
+            name.textContent = city.name || "";
+            const detail = document.createElement("small");
+            detail.textContent = city.display_name || "";
+            button.appendChild(name);
+            if (detail.textContent) button.appendChild(detail);
             button.addEventListener("mousedown", (event) => {
                 event.preventDefault();
                 selectCity(city);

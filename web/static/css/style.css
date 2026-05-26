@@ -237,6 +237,19 @@ a {
     color: var(--ink);
     text-align: left;
     cursor: pointer;
+    display: grid;
+    gap: 4px;
+}
+
+.city-suggest-name {
+    font-weight: 700;
+}
+
+.city-suggest-list small,
+.city-name-list small {
+    color: var(--muted);
+    font-size: 0.82rem;
+    line-height: 1.4;
 }
 
 .city-suggest-list button:last-child {
@@ -278,6 +291,12 @@ a {
     color: var(--brand-strong);
     cursor: pointer;
     font: inherit;
+}
+
+.city-name-list button {
+    display: grid;
+    gap: 2px;
+    text-align: left;
 }
 
 .selected-city-box {
