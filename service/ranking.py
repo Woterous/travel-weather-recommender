@@ -81,9 +81,16 @@ def build_ml_prediction_highlights(ranking: list[dict], limit: int = 3) -> list[
     return candidates[:limit]
 
 
-def build_city_catalog(repository: WeatherRepository, ranking: list[dict]) -> list[dict]:
+def build_city_catalog(repository: WeatherRepository, ranking: list[dict], selected_date: str) -> list[dict]:
     ranked_by_slug = {row["city_slug"]: row for row in ranking}
     added_cities = repository.get_added_cities()
+    forecast_df = repository.get_forecast_daily()
+    available_dates_by_slug = {}
+    if not forecast_df.empty:
+        for city_slug, group in forecast_df.groupby("city_slug"):
+            dates = sorted(str(value) for value in group["date"].dropna().unique())
+            future_dates = [value for value in dates if value >= selected_date]
+            available_dates_by_slug[city_slug] = future_dates[0] if future_dates else dates[-1]
     catalog = []
     seen_slugs = set()
 
@@ -97,7 +104,16 @@ def build_city_catalog(repository: WeatherRepository, ranking: list[dict]) -> li
                 {**ranked_row, "slug": slug, "name": name, "source_label": source, "has_score": True, "is_custom": True}
             )
         else:
-            catalog.append({"slug": slug, "name": name, "source_label": source, "has_score": False, "is_custom": True})
+            catalog.append(
+                {
+                    "slug": slug,
+                    "name": name,
+                    "source_label": source,
+                    "has_score": False,
+                    "is_custom": True,
+                    "available_date": available_dates_by_slug.get(slug),
+                }
+            )
 
     for item in added_cities:
         add_city(item["slug"], item["name"], "城市库")
@@ -141,7 +157,7 @@ def _build_homepage_context_cached(
     }
     return {
         "ranking": ranking,
-        "city_catalog": build_city_catalog(repository, ranking),
+        "city_catalog": build_city_catalog(repository, ranking, selected_date),
         "chart_data": chart_data,
         "ml_predictions": build_ml_prediction_highlights(ranking),
         "weights_preview": build_weights(preferences, aqi_available=aqi_available),

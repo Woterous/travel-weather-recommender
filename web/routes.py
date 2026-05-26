@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import math
+from datetime import date
 from threading import Thread
 from types import SimpleNamespace
 from urllib.parse import urlencode
@@ -45,7 +46,19 @@ def _resolve_selected_date(requested_date: str | None, available_dates: list[str
         return ""
     if requested_date and requested_date in available_dates:
         return requested_date
-    return available_dates[0]
+    return _preferred_forecast_date(available_dates)
+
+
+def _preferred_forecast_date(available_dates: list[str]) -> str:
+    today = date.today().isoformat()
+    for date_text in available_dates:
+        if date_text >= today:
+            return date_text
+    return available_dates[-1] if available_dates else ""
+
+
+def _preferred_repository_forecast_date(repository: WeatherRepository) -> str:
+    return _preferred_forecast_date(repository.get_forecast_dates())
 
 
 def _aqi_display(value) -> str:
@@ -288,14 +301,13 @@ def register_routes(app: Flask) -> None:
         else:
             flash("数据刷新完成。", "success")
         preferences = normalize_preferences(request.form or request.args)
-        date_text = request.form.get("date") or request.args.get("date") or ""
+        date_text = _preferred_repository_forecast_date(WeatherRepository())
         return redirect(url_for("home") + "?" + _query_string(preferences, {"date": date_text}))
 
     @app.post("/refresh/start")
     def refresh_start():
         preferences = normalize_preferences(request.form or request.args)
-        date_text = request.form.get("date") or request.args.get("date") or ""
-        redirect_url = url_for("home") + "?" + _query_string(preferences, {"date": date_text})
+        redirect_url = url_for("home") + "?" + _query_string(preferences)
         job_id = refresh_jobs.create()
 
         def run_refresh() -> None:
@@ -304,6 +316,7 @@ def register_routes(app: Flask) -> None:
 
             try:
                 result = refresh_all_data(progress_callback=emit)
+                final_redirect_url = url_for("home") + "?" + _query_string(preferences, {"date": _preferred_repository_forecast_date(WeatherRepository())})
                 refresh_jobs.emit(
                     job_id,
                     {
@@ -311,7 +324,7 @@ def register_routes(app: Flask) -> None:
                         "stage": "刷新完成",
                         "message": result["message"],
                         "next_step": "正在重新加载首页。",
-                        "redirect_url": redirect_url,
+                        "redirect_url": final_redirect_url,
                     },
                 )
             except Exception as exc:  # pragma: no cover
@@ -353,16 +366,16 @@ def register_routes(app: Flask) -> None:
             flash(result["message"], "warning")
         else:
             flash(f"{city.name} 数据刷新完成。", "success")
-        return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": date_text}))
+        city_dates = repository.get_city_forecast(city.slug)
+        target_date = _preferred_forecast_date(sorted(city_dates["date"].dropna().astype(str).unique())) if not city_dates.empty else date_text
+        return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": target_date}))
 
     @app.post("/city/refresh/start")
     def refresh_city_start():
         preferences = normalize_preferences(request.form)
-        date_text = request.form.get("date") or request.args.get("date") or ""
         city = city_from_search_payload(request.form)
         province = request.form.get("province", "")
         country = request.form.get("country", "")
-        redirect_url = url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": date_text})
         job_id = refresh_jobs.create()
 
         def run_refresh() -> None:
@@ -371,6 +384,9 @@ def register_routes(app: Flask) -> None:
                 result = refresh_city_data(city)
                 repository = WeatherRepository()
                 repository.add_city_record(city, province=province, country=country)
+                city_dates = repository.get_city_forecast(city.slug)
+                target_date = _preferred_forecast_date(sorted(city_dates["date"].dropna().astype(str).unique())) if not city_dates.empty else ""
+                redirect_url = url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": target_date})
                 refresh_jobs.emit(
                     job_id,
                     {

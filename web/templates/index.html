@@ -309,11 +309,15 @@
         </div>
         {% else %}
         <p class="weather-line">暂无 {{ selected_date }} 的天气评分</p>
-        <p class="muted">这个城市已经在城市库中，但还没有当前日期的预报数据。点击详情或重新添加刷新后会生成可排行数据。</p>
+        {% if row.available_date %}
+        <p class="muted">这个城市已有 {{ row.available_date }} 的预报数据；当前筛选日期没有记录，切换日期即可参与排行。</p>
+        {% else %}
+        <p class="muted">这个城市已经在城市库中，但还没有可用预报数据。点击详情或重新添加刷新后会生成可排行数据。</p>
+        {% endif %}
         <div class="city-card-foot">
             <strong class="score-big">-</strong>
             <div class="card-actions">
-                <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.slug) }}?{{ query_with(preferences, date=selected_date) }}">查看详情</a>
+                <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.slug) }}?{{ query_with(preferences, date=row.available_date or selected_date) }}">查看详情</a>
                 {% if row.is_custom %}
                 <form method="post" action="{{ url_for('delete_city') }}" class="inline-delete-form" onsubmit="return confirm('确定从城市库删除 {{ row.name }} 吗？');">
                     <input type="hidden" name="slug" value="{{ row.slug }}">
