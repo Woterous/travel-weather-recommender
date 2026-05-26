@@ -392,3 +392,19 @@ def refresh_city_data(city) -> dict:
         "errors": errors,
         "message": message,
     }
+
+
+def preview_city_forecast(city) -> dict:
+    crawl_time = to_iso_timestamp()
+    errors = []
+    api_payloads = {}
+    try:
+        api_payloads[city.slug] = fetch_forecast_api(city, client=HttpClient())
+    except Exception as exc:  # pragma: no cover
+        errors.append(_friendly_fetch_error("当前天气预览", city.name, exc))
+
+    forecast_df = build_forecast_dataset({}, api_payloads, crawl_time)
+    if forecast_df.empty:
+        return {"city": city, "forecast": None, "errors": errors}
+    row = forecast_df.sort_values("date").iloc[0].to_dict()
+    return {"city": city, "forecast": row, "errors": errors}

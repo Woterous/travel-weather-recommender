@@ -240,6 +240,39 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mocked_search.assert_called_once_with("广", include_remote=False)
 
+    def test_selected_search_city_shows_preview_without_saving_city(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                preview = {
+                    "forecast": {
+                        "date": "2026-05-24",
+                        "weather_detail": "晴",
+                        "avg_temp": 23.0,
+                        "precipitation_mm": 0.0,
+                        "wind_level": 2,
+                    },
+                    "errors": [],
+                }
+                with mock.patch("web.routes.preview_city_forecast", return_value=preview), \
+                    mock.patch("web.routes.refresh_city_data") as mocked_refresh:
+                    response = app.test_client().get(
+                        "/?q=玉田&candidate_slug=cn-130229&candidate_name=玉田&candidate_latitude=39.818843"
+                        "&candidate_longitude=117.734753&candidate_province=河北省&candidate_country=中国"
+                        "&candidate_display_name=中国·河北省·唐山市·玉田县"
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                text = response.data.decode("utf-8")
+                self.assertIn("中国·河北省·唐山市·玉田县", text)
+                self.assertIn("当前天气", text)
+                self.assertIn("添加城市", text)
+                mocked_refresh.assert_not_called()
+                self.assertNotIn("cn-130229", [item["slug"] for item in database.WeatherRepository().get_added_cities()])
+            finally:
+                database.DB_PATH = original_db_path
+
     def test_refresh_city_redirects_to_detail_with_selected_date(self) -> None:
         original_db_path = database.DB_PATH
         with tempfile.TemporaryDirectory() as temp_dir:

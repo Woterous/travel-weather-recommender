@@ -50,13 +50,15 @@
             {% elif search_results %}
                 <div class="city-name-list">
                     {% for result in search_results %}
-                    <form method="post" action="{{ url_for('refresh_city') }}">
-                        <input type="hidden" name="slug" value="{{ result.slug }}">
-                        <input type="hidden" name="name" value="{{ result.name }}">
-                        <input type="hidden" name="latitude" value="{{ result.latitude }}">
-                        <input type="hidden" name="longitude" value="{{ result.longitude }}">
-                        <input type="hidden" name="province" value="{{ result.province }}">
-                        <input type="hidden" name="country" value="{{ result.country }}">
+                    <form method="get" action="{{ url_for('home') }}">
+                        <input type="hidden" name="q" value="{{ search_query }}">
+                        <input type="hidden" name="candidate_slug" value="{{ result.slug }}">
+                        <input type="hidden" name="candidate_name" value="{{ result.name }}">
+                        <input type="hidden" name="candidate_latitude" value="{{ result.latitude }}">
+                        <input type="hidden" name="candidate_longitude" value="{{ result.longitude }}">
+                        <input type="hidden" name="candidate_province" value="{{ result.province }}">
+                        <input type="hidden" name="candidate_country" value="{{ result.country }}">
+                        <input type="hidden" name="candidate_display_name" value="{{ result.display_name }}">
                         {% for key, value in preferences.items() %}
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
@@ -83,7 +85,19 @@
                 <li><span>城市</span><strong>{{ selected_search_city.display_name }}</strong></li>
                 <li><span>纬度</span><strong>{{ selected_search_city.latitude }}</strong></li>
                 <li><span>经度</span><strong>{{ selected_search_city.longitude }}</strong></li>
+                {% if preview_weather and preview_weather.forecast %}
+                <li><span>预览日期</span><strong>{{ preview_weather.forecast.date }}</strong></li>
+                <li><span>当前天气</span><strong>{{ preview_weather.forecast.weather_detail }}</strong></li>
+                <li><span>平均温</span><strong>{{ preview_weather.forecast.avg_temp }}℃</strong></li>
+                <li><span>降水量</span><strong>{{ preview_weather.forecast.precipitation_mm }} mm</strong></li>
+                <li><span>风力</span><strong>{{ preview_weather.forecast.wind_level if preview_weather.forecast.wind_level is not none else "-" }} 级</strong></li>
+                {% elif preview_error %}
+                <li><span>天气预览</span><strong>{{ preview_error }}</strong></li>
+                {% else %}
+                <li><span>天气预览</span><strong>暂不可用，添加后会完整抓取。</strong></li>
+                {% endif %}
             </ul>
+            <p class="muted">点击添加后才会抓取完整未来天气、历史天气并保存到城市库。</p>
             <form method="post" action="{{ url_for('refresh_city') }}" class="add-city-form">
                 <input type="hidden" name="slug" value="{{ selected_search_city.slug }}">
                 <input type="hidden" name="name" value="{{ selected_search_city.name }}">

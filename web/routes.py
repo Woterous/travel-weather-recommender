@@ -15,7 +15,7 @@ from service.city_search import city_from_search_payload, search_cities
 from service.compare import build_compare_context
 from service.database import WeatherRepository
 from service.history_analysis import get_city_history_series, get_history_ranking, month_num_options
-from service.pipeline import refresh_all_data, refresh_city_data
+from service.pipeline import preview_city_forecast, refresh_all_data, refresh_city_data
 from service.ranking import build_city_detail_context, build_homepage_context
 from service.refresh_progress import refresh_jobs
 from service.scoring import build_weights
@@ -72,6 +72,18 @@ def _selected_search_city_from_args(args) -> dict | None:
     }
 
 
+def _candidate_payload_from_args(args) -> dict:
+    return {
+        "slug": args.get("candidate_slug", "").strip(),
+        "name": args.get("candidate_name", "").strip(),
+        "latitude": args.get("candidate_latitude", "").strip(),
+        "longitude": args.get("candidate_longitude", "").strip(),
+        "province": args.get("candidate_province", "").strip(),
+        "country": args.get("candidate_country", "").strip(),
+        "display_name": args.get("candidate_display_name", "").strip(),
+    }
+
+
 def _city_for_detail(repository: WeatherRepository, city_slug: str):
     city_record = repository.get_city_record(city_slug)
     if city_record:
@@ -118,11 +130,18 @@ def register_routes(app: Flask) -> None:
         search_results = []
         search_error = ""
         selected_search_city = _selected_search_city_from_args(request.args)
+        preview_weather = None
+        preview_error = ""
         if search_query:
             try:
                 search_results = search_cities(search_query)
             except Exception as exc:
                 search_error = f"城市搜索失败：{exc}"
+        if selected_search_city:
+            try:
+                preview_weather = preview_city_forecast(city_from_search_payload(_candidate_payload_from_args(request.args)))
+            except Exception as exc:
+                preview_error = f"当前天气预览失败：{exc}"
         context = (
             build_homepage_context(repository, selected_date, preferences)
             if selected_date
@@ -146,6 +165,8 @@ def register_routes(app: Flask) -> None:
             search_results=search_results,
             search_error=search_error,
             selected_search_city=selected_search_city,
+            preview_weather=preview_weather,
+            preview_error=preview_error,
             added_cities=repository.get_added_cities(),
             **context,
         )

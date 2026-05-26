@@ -174,8 +174,7 @@ function initCitySuggestions() {
     const input = form.querySelector("[data-city-suggest-input]");
     const list = form.querySelector("[data-city-suggest-list]");
     const searchUrl = form.dataset.citySearchUrl;
-    const refreshUrl = form.dataset.cityRefreshUrl;
-    if (!input || !list || !searchUrl || !refreshUrl) return;
+    if (!input || !list || !searchUrl) return;
 
     const cache = new Map();
     let debounceTimer = null;
@@ -193,31 +192,20 @@ function initCitySuggestions() {
         ].forEach((key) => params.delete(key));
     }
 
-    function appendHidden(dynamicForm, name, value) {
-        const field = document.createElement("input");
-        field.type = "hidden";
-        field.name = name;
-        field.value = value == null ? "" : value;
-        dynamicForm.appendChild(field);
-    }
-
     function selectCity(city) {
+        const target = new URL(form.action || window.location.pathname, window.location.origin);
         const params = new URLSearchParams(window.location.search);
         clearCandidates(params);
-        const dynamicForm = document.createElement("form");
-        dynamicForm.method = "post";
-        dynamicForm.action = refreshUrl;
-        appendHidden(dynamicForm, "slug", city.slug || "");
-        appendHidden(dynamicForm, "name", city.name || "");
-        appendHidden(dynamicForm, "latitude", city.latitude || "");
-        appendHidden(dynamicForm, "longitude", city.longitude || "");
-        appendHidden(dynamicForm, "province", city.province || "");
-        appendHidden(dynamicForm, "country", city.country || "");
-        params.forEach((value, key) => {
-            if (key !== "q") appendHidden(dynamicForm, key, value);
-        });
-        document.body.appendChild(dynamicForm);
-        dynamicForm.submit();
+        params.set("q", input.value.trim() || city.name || "");
+        params.set("candidate_slug", city.slug || "");
+        params.set("candidate_name", city.name || "");
+        params.set("candidate_latitude", city.latitude || "");
+        params.set("candidate_longitude", city.longitude || "");
+        params.set("candidate_province", city.province || "");
+        params.set("candidate_country", city.country || "");
+        params.set("candidate_display_name", city.display_name || city.name || "");
+        target.search = params.toString();
+        window.location.href = target.toString();
     }
 
     function renderSuggestions(results) {
