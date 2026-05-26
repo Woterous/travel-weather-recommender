@@ -227,6 +227,12 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertEqual(results[0]["name"], "广陵")
         self.assertIn("江苏省·扬州市·广陵区", results[0]["display_name"])
 
+    def test_city_search_does_not_show_builtin_city_source(self) -> None:
+        results = search_cities("三亚", include_remote=False)
+
+        self.assertTrue(results)
+        self.assertTrue(all("内置城市" not in item["display_name"] for item in results))
+
     def test_city_search_api_returns_json_results(self) -> None:
         with mock.patch("web.routes.search_cities", return_value=[{"name": "广州", "slug": "geo-1809858"}]):
             response = app.test_client().get("/api/cities/search?q=广")

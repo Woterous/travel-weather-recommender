@@ -5,7 +5,7 @@ from dataclasses import asdict
 from functools import lru_cache
 from pathlib import Path
 
-from config.cities import CITIES, CITY_BY_SLUG, CityConfig
+from config.cities import CITY_BY_SLUG, CityConfig
 from config.sources import build_geocoding_api_url
 from crawler.fetcher import HttpClient
 
@@ -146,16 +146,6 @@ def _load_china_admin_index() -> list[dict]:
     return index
 
 
-def _city_to_search_result(city: CityConfig, province: str, source: str, country: str = "中国") -> dict:
-    return {
-        **asdict(city),
-        "province": province,
-        "country": country,
-        "source": source,
-        "display_name": "·".join(part for part in [country, province, city.name] if part),
-    }
-
-
 def _dedupe_city_results(results: list[dict]) -> list[dict]:
     deduped = []
     seen_keys = set()
@@ -193,11 +183,6 @@ def search_cities(query: str, client: HttpClient | None = None, include_remote: 
         return []
     lowered = cleaned.lower()
 
-    fixed_matches = [
-        _city_to_search_result(city, province="内置城市", source="local")
-        for city in CITIES
-        if lowered in city.name.lower() or lowered in city.pinyin.lower()
-    ]
     admin_matches = [item for item in _load_china_admin_index() if lowered in item["search_text"]]
     admin_matches.sort(
         key=lambda item: (
@@ -207,7 +192,7 @@ def search_cities(query: str, client: HttpClient | None = None, include_remote: 
         )
     )
 
-    local_matches = fixed_matches + admin_matches
+    local_matches = admin_matches
     has_exact_local_match = any(item["name"].lower() == cleaned.lower() for item in local_matches)
     should_search_remote = include_remote and len(cleaned) > 1 and not has_exact_local_match
 
