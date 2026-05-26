@@ -4,7 +4,6 @@ from functools import lru_cache
 
 import pandas as pd
 
-from config.cities import CITIES
 from service.database import WeatherRepository
 from service.history_analysis import build_history_baseline_lookup
 from service.ml_predictor import WeatherKnnForecastModel, build_model_summary
@@ -85,31 +84,23 @@ def build_ml_prediction_highlights(ranking: list[dict], limit: int = 3) -> list[
 def build_city_catalog(repository: WeatherRepository, ranking: list[dict]) -> list[dict]:
     ranked_by_slug = {row["city_slug"]: row for row in ranking}
     added_cities = repository.get_added_cities()
-    added_slugs = {item["slug"] for item in added_cities}
-    default_slugs = {city.slug for city in CITIES}
     catalog = []
     seen_slugs = set()
 
-    def add_city(slug: str, name: str, source: str, is_custom: bool = False) -> None:
+    def add_city(slug: str, name: str, source: str) -> None:
         if not slug or slug in seen_slugs:
             return
         seen_slugs.add(slug)
         ranked_row = ranked_by_slug.get(slug)
         if ranked_row:
             catalog.append(
-                {**ranked_row, "slug": slug, "name": name, "source_label": source, "has_score": True, "is_custom": is_custom}
+                {**ranked_row, "slug": slug, "name": name, "source_label": source, "has_score": True, "is_custom": True}
             )
         else:
-            catalog.append({"slug": slug, "name": name, "source_label": source, "has_score": False, "is_custom": is_custom})
+            catalog.append({"slug": slug, "name": name, "source_label": source, "has_score": False, "is_custom": True})
 
-    for city in CITIES:
-        add_city(city.slug, city.name, "默认城市")
-    for item in repository.get_available_cities():
-        source = "已添加" if item["slug"] in added_slugs else "缓存城市"
-        is_custom = item["slug"] in added_slugs and item["slug"] not in default_slugs
-        add_city(item["slug"], item["name"], source, is_custom=is_custom)
     for item in added_cities:
-        add_city(item["slug"], item["name"], "已添加", is_custom=item["slug"] not in default_slugs)
+        add_city(item["slug"], item["name"], "城市库")
     return catalog
 
 

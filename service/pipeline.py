@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from config.cities import CITIES, CityConfig
+from config.cities import CityConfig
 from config.sources import default_history_range
 from crawler.air_quality_crawler import fetch_air_quality_api
 from crawler.fetcher import HttpClient
@@ -50,8 +50,8 @@ def _history_cache_is_current(repository: WeatherRepository, city_slug: str) -> 
 
 
 def _refresh_city_list(repository: WeatherRepository) -> list[CityConfig]:
-    cities = list(CITIES)
-    seen_slugs = {city.slug for city in cities}
+    cities = []
+    seen_slugs = set()
     for item in repository.get_added_cities():
         slug = str(item.get("slug") or "").strip()
         if not slug or slug in seen_slugs:

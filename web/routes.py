@@ -73,8 +73,15 @@ def _selected_search_city_from_args(args) -> dict | None:
 
 
 def _city_for_detail(repository: WeatherRepository, city_slug: str):
-    if city_slug in CITY_BY_SLUG:
-        return CITY_BY_SLUG[city_slug]
+    city_record = repository.get_city_record(city_slug)
+    if city_record:
+        return SimpleNamespace(
+            slug=city_record["slug"],
+            name=city_record["name"],
+            pinyin=city_record["pinyin"],
+            latitude=city_record["latitude"],
+            longitude=city_record["longitude"],
+        )
     city_meta = repository.get_city_meta(city_slug)
     if not city_meta:
         return None
@@ -320,12 +327,10 @@ def register_routes(app: Flask) -> None:
         city_slug = request.form.get("slug", "").strip()
         city_name = request.form.get("name", "").strip() or "该城市"
         repository = WeatherRepository()
-        if city_slug in CITY_BY_SLUG:
-            flash("默认城市不能从城市库删除。", "warning")
-        elif repository.delete_added_city(city_slug, purge_cached_data=True):
+        if repository.delete_city_record(city_slug, purge_cached_data=True):
             flash(f"{city_name} 已从自定义城市库删除。", "success")
         else:
-            flash("没有找到需要删除的自定义城市。", "warning")
+            flash("没有找到需要删除的城市。", "warning")
         return redirect(url_for("home") + "?" + _query_string(preferences, {"date": date_text}))
 
     @app.get("/api/cities/search")

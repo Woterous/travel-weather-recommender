@@ -119,9 +119,22 @@ class SearchAndModelTest(unittest.TestCase):
 
                 repo.add_city_record(city, province="广东", country="中国")
                 added = repo.get_added_cities()
+                added_by_slug = {item["slug"]: item for item in added}
 
-                self.assertEqual(added[0]["slug"], "geo-1809858")
-                self.assertEqual(added[0]["name"], "广州")
+                self.assertEqual(added_by_slug["geo-1809858"]["name"], "广州")
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_default_cities_seed_into_editable_city_library(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                names = [item["name"] for item in repo.get_added_cities()]
+
+                self.assertIn("北京", names)
+                self.assertIn("三亚", names)
             finally:
                 database.DB_PATH = original_db_path
 
@@ -154,14 +167,14 @@ class SearchAndModelTest(unittest.TestCase):
                 deleted = repo.delete_added_city(city.slug)
 
                 self.assertTrue(deleted)
-                self.assertEqual(repo.get_added_cities(), [])
+                self.assertNotIn(city.slug, [item["slug"] for item in repo.get_added_cities()])
                 self.assertTrue(repo.get_city_forecast(city.slug).empty)
                 self.assertTrue(repo.get_history_monthly(city.slug).empty)
                 self.assertTrue(repo.get_history_daily(city.slug).empty)
             finally:
                 database.DB_PATH = original_db_path
 
-    def test_homepage_city_catalog_includes_default_and_added_cities(self) -> None:
+    def test_homepage_city_catalog_reads_editable_city_library(self) -> None:
         original_db_path = database.DB_PATH
         with tempfile.TemporaryDirectory() as temp_dir:
             database.DB_PATH = Path(temp_dir) / "test.sqlite3"
@@ -175,6 +188,7 @@ class SearchAndModelTest(unittest.TestCase):
 
                 self.assertIn("北京", names)
                 self.assertIn("广州", names)
+                self.assertTrue(all(item["is_custom"] for item in context["city_catalog"]))
             finally:
                 _build_homepage_context_cached.cache_clear()
                 database.DB_PATH = original_db_path
@@ -255,18 +269,28 @@ class SearchAndModelTest(unittest.TestCase):
 
                 self.assertEqual(response.status_code, 302)
                 self.assertIn("date=2026-05-24", response.headers["Location"])
-                self.assertEqual(repo.get_added_cities(), [])
+                self.assertNotIn(city.slug, [item["slug"] for item in repo.get_added_cities()])
             finally:
                 database.DB_PATH = original_db_path
 
-    def test_delete_city_route_keeps_default_city(self) -> None:
-        response = app.test_client().post(
-            "/city/delete",
-            data={"slug": "beijing", "name": "北京", "date": "2026-05-24", **DEFAULT_PREFERENCES},
-        )
+    def test_delete_city_route_can_remove_seeded_default_city(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                response = app.test_client().post(
+                    "/city/delete",
+                    data={"slug": "beijing", "name": "北京", "date": "2026-05-24", **DEFAULT_PREFERENCES},
+                )
 
-        self.assertEqual(response.status_code, 302)
-        self.assertIn("date=2026-05-24", response.headers["Location"])
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("date=2026-05-24", response.headers["Location"])
+                self.assertNotIn("beijing", [item["slug"] for item in repo.get_added_cities()])
+                detail_response = app.test_client().get("/city/beijing")
+                self.assertEqual(detail_response.status_code, 302)
+            finally:
+                database.DB_PATH = original_db_path
 
     def test_knn_model_predicts_score(self) -> None:
         import pandas as pd
@@ -463,7 +487,7 @@ class RefreshProgressTest(unittest.TestCase):
             ]
         }
 
-        with mock.patch.object(pipeline, "CITIES", [city]), \
+        with mock.patch.object(pipeline, "_refresh_city_list", return_value=[city]), \
             mock.patch.object(pipeline, "to_iso_timestamp", return_value="2026-05-24T16:00:00"), \
             mock.patch.object(pipeline, "fetch_forecast_page", side_effect=RuntimeError("HTTPSConnectionPool raw ssl failure")), \
             mock.patch.object(pipeline, "fetch_forecast_api", return_value=api_payload), \
@@ -482,8 +506,7 @@ class RefreshProgressTest(unittest.TestCase):
         self.assertIn("Open-Meteo API 兜底", result["message"])
         self.assertNotIn("HTTPSConnectionPool", result["message"])
 
-    def test_refresh_all_data_includes_added_cities(self) -> None:
-        default_city = CityConfig("beijing", "北京", "beijing", 39.9042, 116.4074)
+    def test_refresh_all_data_uses_editable_city_library(self) -> None:
         added_city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
         original_db_path = database.DB_PATH
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -498,8 +521,7 @@ class RefreshProgressTest(unittest.TestCase):
                     calls.append(city.slug)
                     return {"records": []}
 
-                with mock.patch.object(pipeline, "CITIES", [default_city]), \
-                    mock.patch.object(pipeline, "to_iso_timestamp", return_value="2026-05-24T16:00:00"), \
+                with mock.patch.object(pipeline, "to_iso_timestamp", return_value="2026-05-24T16:00:00"), \
                     mock.patch.object(pipeline, "fetch_forecast_page", return_value={"records": []}), \
                     mock.patch.object(pipeline, "fetch_forecast_api", side_effect=fake_forecast_api), \
                     mock.patch.object(pipeline, "fetch_air_quality_api", return_value={"records": []}), \
@@ -511,7 +533,8 @@ class RefreshProgressTest(unittest.TestCase):
                     mock.patch.object(pipeline, "log_refresh"):
                     pipeline.refresh_all_data()
 
-                self.assertEqual(calls, ["beijing", "geo-1809858"])
+                self.assertIn("beijing", calls)
+                self.assertIn("geo-1809858", calls)
             finally:
                 database.DB_PATH = original_db_path
 

@@ -6,6 +6,8 @@ import re
 
 import pandas as pd
 
+from config.cities import CITIES
+
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DB_PATH = BASE_DIR / "data" / "db" / "weather_recommender.sqlite3"
@@ -129,6 +131,29 @@ def ensure_database() -> None:
             )
             """
         )
+        cursor.execute(
+            """
+            CREATE TABLE IF NOT EXISTS app_state (
+                key TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            )
+            """
+        )
+        seeded = cursor.execute(
+            "SELECT value FROM app_state WHERE key = 'default_cities_seeded'"
+        ).fetchone()
+        if not seeded:
+            cursor.executemany(
+                """
+                INSERT OR IGNORE INTO added_cities
+                    (slug, name, pinyin, latitude, longitude, province, country, added_time)
+                VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """,
+                [(city.slug, city.name, city.pinyin, city.latitude, city.longitude, "城市库", "中国") for city in CITIES],
+            )
+            cursor.execute(
+                "INSERT INTO app_state (key, value) VALUES ('default_cities_seeded', '1')"
+            )
         connection.commit()
     finally:
         connection.close()
@@ -201,10 +226,6 @@ class WeatherRepository:
     def get_available_cities(self) -> list[dict]:
         df = self._read_df(
             """
-            SELECT city_slug, city_name, MAX(crawl_time) AS crawl_time
-            FROM forecast_daily
-            GROUP BY city_slug, city_name
-            UNION
             SELECT slug AS city_slug, name AS city_name, added_time AS crawl_time
             FROM added_cities
             ORDER BY city_name
@@ -257,7 +278,20 @@ class WeatherRepository:
             return []
         return df.to_dict("records")
 
-    def delete_added_city(self, city_slug: str, purge_cached_data: bool = True) -> bool:
+    def get_city_record(self, city_slug: str) -> dict | None:
+        df = self._read_df(
+            """
+            SELECT slug, name, pinyin, latitude, longitude, province, country
+            FROM added_cities
+            WHERE slug = ?
+            """,
+            (city_slug,),
+        )
+        if df.empty:
+            return None
+        return df.iloc[0].to_dict()
+
+    def delete_city_record(self, city_slug: str, purge_cached_data: bool = True) -> bool:
         connection = get_connection()
         try:
             cursor = connection.execute("DELETE FROM added_cities WHERE slug = ?", (city_slug,))
@@ -269,6 +303,9 @@ class WeatherRepository:
             return deleted
         finally:
             connection.close()
+
+    def delete_added_city(self, city_slug: str, purge_cached_data: bool = True) -> bool:
+        return self.delete_city_record(city_slug, purge_cached_data=purge_cached_data)
 
     def get_city_meta(self, city_slug: str) -> dict | None:
         df = self._read_df(
