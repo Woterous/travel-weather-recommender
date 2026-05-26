@@ -10,6 +10,21 @@
         <p>查看指定日期的推荐结论、基础天气、机器学习预测、未来趋势和历史月度表现。</p>
         <div class="hero-actions">
             <button type="button" class="button button-primary" onclick="history.back()">返回上一页</button>
+            {% if selected and not city_in_library and can_add_city_to_library %}
+            <form method="post" action="{{ url_for('add_city_to_library') }}" class="inline-action-form">
+                <input type="hidden" name="slug" value="{{ city.slug }}">
+                <input type="hidden" name="name" value="{{ request.args.get('name', city.name) }}">
+                <input type="hidden" name="latitude" value="{{ city.latitude if city.latitude is not none else request.args.get('latitude', '') }}">
+                <input type="hidden" name="longitude" value="{{ city.longitude if city.longitude is not none else request.args.get('longitude', '') }}">
+                <input type="hidden" name="province" value="{{ request.args.get('province', '') }}">
+                <input type="hidden" name="country" value="{{ request.args.get('country', '') }}">
+                {% for key, value in preferences.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <input type="hidden" name="date" value="{{ selected_date }}">
+                <button type="submit" class="button button-ghost">加入城市库</button>
+            </form>
+            {% endif %}
             <a class="button button-ghost" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=city.slug, city_b='beijing' if city.slug != 'beijing' else 'shanghai') }}">加入对比</a>
         </div>
     </div>
