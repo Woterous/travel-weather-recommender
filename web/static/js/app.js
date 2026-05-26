@@ -403,6 +403,7 @@ function initCityAutoload() {
     const messageNode = panel.querySelector("[data-city-load-message]");
     const barNode = panel.querySelector("[data-city-load-bar]");
     const percentNode = panel.querySelector("[data-city-load-percent]");
+    const stageNode = panel.querySelector("[data-city-load-stage]");
     const refreshUrl = panel.dataset.refreshUrl;
     if (!form || !refreshUrl || typeof EventSource === "undefined") return;
 
@@ -410,6 +411,9 @@ function initCityAutoload() {
         const step = Number(event.step || 1);
         const total = Number(event.total || 4);
         const percent = Math.max(12, Math.min(100, Math.round((step / total) * 100)));
+        panel.classList.toggle("is-error", event.status === "error");
+        panel.classList.toggle("is-done", ["done", "warning"].includes(event.status));
+        if (stageNode) stageNode.textContent = event.stage || (event.status === "error" ? "加载失败" : "正在加载");
         if (barNode) barNode.style.width = `${percent}%`;
         if (percentNode) percentNode.textContent = `${percent}%`;
         if (messageNode) messageNode.textContent = event.message || "";
