@@ -57,6 +57,18 @@ def _preferred_forecast_date(available_dates: list[str]) -> str:
     return available_dates[-1] if available_dates else ""
 
 
+def _resolve_history_month(requested_month: str | None, month_options: list[int]) -> int:
+    fallback_month = month_options[0] if month_options else 1
+    if requested_month:
+        try:
+            requested_value = int(requested_month)
+        except ValueError:
+            requested_value = fallback_month
+        return requested_value if requested_value in month_options else fallback_month
+    current_month = date.today().month
+    return current_month if current_month in month_options else fallback_month
+
+
 def _preferred_repository_forecast_date(repository: WeatherRepository) -> str:
     return _preferred_forecast_date(repository.get_forecast_dates())
 
@@ -129,6 +141,17 @@ def _city_from_query(city_slug: str, args):
     return CityConfig(city_slug, name, city_slug, float(latitude), float(longitude))
 
 
+def _record_search_history_from_args(repository: WeatherRepository, city_slug: str, args) -> None:
+    city = _city_from_query(city_slug, args)
+    if city is None:
+        return
+    repository.add_search_history(
+        city,
+        province=args.get("province", "").strip(),
+        country=args.get("country", "").strip(),
+    )
+
+
 def register_routes(app: Flask) -> None:
     @app.context_processor
     def inject_globals():
@@ -190,7 +213,7 @@ def register_routes(app: Flask) -> None:
             selected_search_city=selected_search_city,
             preview_weather=preview_weather,
             preview_error=preview_error,
-            added_cities=repository.get_added_cities(),
+            search_history=repository.get_search_history(),
             **context,
         )
 
@@ -209,6 +232,7 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "preference.html",
             preferences=preferences,
+            default_preferences=DEFAULT_PREFERENCES,
             selected_date=request.args.get("date") or "",
             latest_refresh=repository.get_latest_refresh_info(),
             aqi_available=repository.aqi_available(),
@@ -227,8 +251,10 @@ def register_routes(app: Flask) -> None:
         if city is None:
             flash("当前城市还没有本地数据，请先通过首页搜索该城市。", "warning")
             return redirect(url_for("home") + "?" + _query_string(preferences))
+        _record_search_history_from_args(repository, city_slug, request.args)
         context = build_city_detail_context(repository, city_slug, selected_date, preferences) if selected_date else {}
         autoload_city = request.args.get("autoload") == "1" and not context.get("selected")
+        city_record = repository.get_city_record(city_slug)
         return render_template(
             "city_detail.html",
             city=city,
@@ -237,6 +263,8 @@ def register_routes(app: Flask) -> None:
             preferences=preferences,
             latest_refresh=repository.get_latest_refresh_info(),
             autoload_city=autoload_city,
+            city_in_library=city_record is not None,
+            can_add_city_to_library=bool(city.latitude or request.args.get("latitude")),
             **context,
         )
 
@@ -271,7 +299,7 @@ def register_routes(app: Flask) -> None:
         history_df = repository.get_history_monthly()
         city_series = get_city_history_series(history_df, city_slug)
         month_options = month_num_options(history_df)
-        selected_month = int(request.args.get("month", month_options[0] if month_options else 1))
+        selected_month = _resolve_history_month(request.args.get("month"), month_options)
         ranking = get_history_ranking(history_df, selected_month, metric)
         chart_data = {
             "months": [item["month_key"] for item in city_series],
@@ -307,7 +335,7 @@ def register_routes(app: Flask) -> None:
     @app.post("/refresh/start")
     def refresh_start():
         preferences = normalize_preferences(request.form or request.args)
-        redirect_url = url_for("home") + "?" + _query_string(preferences)
+        home_path = url_for("home")
         job_id = refresh_jobs.create()
 
         def run_refresh() -> None:
@@ -316,7 +344,7 @@ def register_routes(app: Flask) -> None:
 
             try:
                 result = refresh_all_data(progress_callback=emit)
-                final_redirect_url = url_for("home") + "?" + _query_string(preferences, {"date": _preferred_repository_forecast_date(WeatherRepository())})
+                final_redirect_url = home_path + "?" + _query_string(preferences, {"date": _preferred_repository_forecast_date(WeatherRepository())})
                 refresh_jobs.emit(
                     job_id,
                     {
@@ -376,17 +404,27 @@ def register_routes(app: Flask) -> None:
         city = city_from_search_payload(request.form)
         province = request.form.get("province", "")
         country = request.form.get("country", "")
+        city_detail_path = url_for("city_detail", city_slug=city.slug)
         job_id = refresh_jobs.create()
 
         def run_refresh() -> None:
             try:
-                refresh_jobs.emit(job_id, {"status": "running", "step": 1, "total": 4, "stage": "添加城市", "message": f"正在准备 {city.name} 的天气数据。"})
+                refresh_jobs.emit(job_id, {"status": "running", "step": 1, "total": 4, "stage": "加载详情", "message": f"正在准备 {city.name} 的天气数据。"})
                 result = refresh_city_data(city)
                 repository = WeatherRepository()
-                repository.add_city_record(city, province=province, country=country)
                 city_dates = repository.get_city_forecast(city.slug)
                 target_date = _preferred_forecast_date(sorted(city_dates["date"].dropna().astype(str).unique())) if not city_dates.empty else ""
-                redirect_url = url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": target_date})
+                redirect_url = city_detail_path + "?" + _query_string(
+                    preferences,
+                    {
+                        "date": target_date,
+                        "name": city.name,
+                        "latitude": city.latitude,
+                        "longitude": city.longitude,
+                        "province": province,
+                        "country": country,
+                    },
+                )
                 refresh_jobs.emit(
                     job_id,
                     {
@@ -403,6 +441,33 @@ def register_routes(app: Flask) -> None:
 
         Thread(target=run_refresh, daemon=True).start()
         return jsonify({"job_id": job_id})
+
+    @app.post("/city/add")
+    def add_city_to_library():
+        preferences = normalize_preferences(request.form)
+        date_text = request.form.get("date") or request.args.get("date") or ""
+        city = city_from_search_payload(request.form)
+        repository = WeatherRepository()
+        repository.add_city_record(
+            city,
+            province=request.form.get("province", ""),
+            country=request.form.get("country", ""),
+        )
+        flash(f"{city.name} 已加入城市库。", "success")
+        return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": date_text}))
+
+    @app.post("/search-history/delete")
+    def delete_search_history():
+        preferences = normalize_preferences(request.form)
+        date_text = request.form.get("date") or request.args.get("date") or ""
+        city_slug = request.form.get("slug", "").strip()
+        city_name = request.form.get("name", "").strip() or "该城市"
+        repository = WeatherRepository()
+        if repository.delete_search_history(city_slug):
+            flash(f"{city_name} 已从搜索历史删除。", "success")
+        else:
+            flash("没有找到需要删除的搜索历史。", "warning")
+        return redirect(url_for("home") + "?" + _query_string(preferences, {"date": date_text}))
 
     @app.post("/city/delete")
     def delete_city():

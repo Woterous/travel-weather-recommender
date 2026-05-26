@@ -3,36 +3,44 @@
 {% block title %}历史分析 | 旅行天气推荐系统{% endblock %}
 
 {% block content %}
+{% set metric_label = "历史适宜度" %}
+{% if metric == "rainy_ratio" %}{% set metric_label = "雨天频率" %}{% endif %}
+{% if metric == "comfortable_ratio" %}{% set metric_label = "舒适温度占比" %}{% endif %}
+{% if metric == "temp_stability" %}{% set metric_label = "温度波动" %}{% endif %}
 <section class="hero-panel compact">
     <div class="hero-copy">
         <p class="eyebrow">历史分析页</p>
         <h1>{{ city.name }} 的月度历史画像</h1>
         <p>首版以月度统计为主，不依赖全量日级明细。</p>
+        <div class="hero-actions">
+            <button type="button" class="button button-primary" onclick="history.back()">返回上一页</button>
+            <a class="button button-ghost" href="{{ url_for('home') }}?{{ query_with(preferences) }}">返回首页</a>
+        </div>
     </div>
-    <form method="get" action="{{ url_for('history_page') }}" class="card filter-form">
+    <form method="get" action="{{ url_for('history_page') }}" class="card filter-form" data-auto-submit-form>
         <label>城市</label>
-        <select name="city">
+        <select name="city" aria-label="城市">
             {% for item in cities %}
                 <option value="{{ item.slug }}" {% if item.slug == city.slug %}selected{% endif %}>{{ item.name }}</option>
             {% endfor %}
         </select>
         <label>月份</label>
-        <select name="month">
+        <select name="month" aria-label="月份">
             {% for month in month_options %}
                 <option value="{{ month }}" {% if month == selected_month %}selected{% endif %}>{{ month }} 月</option>
             {% endfor %}
         </select>
-        <label>指标</label>
-        <select name="metric">
+        <label>城市排名依据</label>
+        <select name="metric" aria-label="城市排名依据">
             <option value="suitability" {% if metric == 'suitability' %}selected{% endif %}>历史适宜度</option>
             <option value="rainy_ratio" {% if metric == 'rainy_ratio' %}selected{% endif %}>雨天频率</option>
             <option value="comfortable_ratio" {% if metric == 'comfortable_ratio' %}selected{% endif %}>舒适温度占比</option>
             <option value="temp_stability" {% if metric == 'temp_stability' %}selected{% endif %}>温度波动</option>
         </select>
+        <p class="field-hint">只改变下方城市排名表的排序方式；左侧趋势图仍展示当前城市的长期走势。</p>
         {% for key, value in preferences.items() %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endfor %}
-        <button type="submit" class="button">查看历史分析</button>
     </form>
 </section>
 
@@ -53,7 +61,7 @@
 </section>
 
 <section class="card">
-    <div class="section-head"><h2>{{ selected_month }} 月城市排名</h2><span>最近刷新 {{ latest_refresh.refresh_time }}</span></div>
+    <div class="section-head"><h2>{{ selected_month }} 月城市排名</h2><span>按 {{ metric_label }} 排序</span></div>
     <table class="data-table">
         <thead>
             <tr>

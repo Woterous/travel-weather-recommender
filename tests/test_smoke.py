@@ -25,6 +25,7 @@ from service import pipeline
 from service.ranking import _build_homepage_context_cached, build_homepage_context
 from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
+from web.routes import _resolve_history_month
 
 
 class AppSmokeTest(unittest.TestCase):
@@ -40,6 +41,10 @@ class AppSmokeTest(unittest.TestCase):
         response = self.client.post("/api/assistant", json={"message": "今天推荐哪个城市"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("answer", response.get_json())
+
+    def test_history_month_defaults_to_current_month(self) -> None:
+        self.assertEqual(_resolve_history_month(None, list(range(1, 13))), date.today().month)
+        self.assertEqual(_resolve_history_month("8", list(range(1, 13))), 8)
 
 
 class AqiIntegrationTest(unittest.TestCase):
@@ -288,7 +293,8 @@ class SearchAndModelTest(unittest.TestCase):
                 text = response.data.decode("utf-8")
                 self.assertIn("中国·河北省·唐山市·玉田县", text)
                 self.assertIn("当前天气", text)
-                self.assertIn("添加城市", text)
+                self.assertIn("查看详情", text)
+                self.assertNotIn("添加城市</button>", text)
                 mocked_refresh.assert_not_called()
                 self.assertNotIn("cn-130229", [item["slug"] for item in database.WeatherRepository().get_added_cities()])
             finally:
@@ -317,6 +323,137 @@ class SearchAndModelTest(unittest.TestCase):
                 self.assertEqual(response.status_code, 302)
                 self.assertIn("/city/geo-1809858", response.headers["Location"])
                 self.assertIn("date=2026-05-24", response.headers["Location"])
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_refresh_city_start_builds_redirect_outside_request_context(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                captured = {}
+                job_store = RefreshJobStore()
+
+                class DelayedThread:
+                    def __init__(self, target, daemon=False):
+                        captured["target"] = target
+
+                    def start(self):
+                        pass
+
+                with mock.patch("web.routes.refresh_jobs", job_store), \
+                    mock.patch("web.routes.Thread", DelayedThread), \
+                    mock.patch("web.routes.refresh_city_data", return_value={"errors": [], "message": "ok"}):
+                    response = app.test_client().post(
+                        "/city/refresh/start",
+                        data={
+                            "slug": "cn-440300",
+                            "name": "深圳",
+                            "latitude": "22.546054",
+                            "longitude": "114.025974",
+                            "province": "广东省",
+                            "country": "中国",
+                            "date": "2026-05-31",
+                            **DEFAULT_PREFERENCES,
+                        },
+                    )
+                    self.assertEqual(response.status_code, 200)
+                    job_id = response.get_json()["job_id"]
+                    captured["target"]()
+                    events = list(job_store.listen(job_id, timeout=0.01))
+
+                self.assertEqual(events[-1]["status"], "done")
+                self.assertIn("/city/cn-440300", events[-1]["redirect_url"])
+                self.assertIn("name=%E6%B7%B1%E5%9C%B3", events[-1]["redirect_url"])
+                self.assertIn("latitude=22.546054", events[-1]["redirect_url"])
+                self.assertNotIn("Working outside", events[-1]["message"])
+                self.assertNotIn("cn-440300", [item["slug"] for item in database.WeatherRepository().get_added_cities()])
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_add_city_to_library_requires_explicit_detail_action(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                response = app.test_client().post(
+                    "/city/add",
+                    data={
+                        "slug": "cn-440300",
+                        "name": "深圳",
+                        "latitude": "22.546054",
+                        "longitude": "114.025974",
+                        "province": "广东省",
+                        "country": "中国",
+                        "date": "2026-05-31",
+                        **DEFAULT_PREFERENCES,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("/city/cn-440300", response.headers["Location"])
+                self.assertIn("date=2026-05-31", response.headers["Location"])
+                self.assertIn("cn-440300", [item["slug"] for item in database.WeatherRepository().get_added_cities()])
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_home_search_history_items_can_be_deleted(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-test-history", "测试城", "ceshicheng", 31.2, 121.5)
+                repo.add_city_record(city, province="测试省", country="中国")
+                repo.add_search_history(city, province="测试省", country="中国")
+
+                response = app.test_client().get("/")
+
+                self.assertEqual(response.status_code, 200)
+                text = response.data.decode("utf-8")
+                self.assertIn("搜索历史", text)
+                self.assertIn("/search-history/delete", text)
+                self.assertIn('aria-label="删除 测试城"', text)
+                self.assertIn('class="history-city-delete"', text)
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_city_detail_query_records_search_history_without_adding_city(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                with mock.patch("web.routes.build_city_detail_context", return_value={}):
+                    response = app.test_client().get(
+                        "/city/cn-440300?name=深圳&latitude=22.546054&longitude=114.025974"
+                        "&province=广东省&country=中国&date=2026-05-31"
+                    )
+
+                self.assertEqual(response.status_code, 200)
+                repo = database.WeatherRepository()
+                self.assertIn("cn-440300", [item["slug"] for item in repo.get_search_history()])
+                self.assertNotIn("cn-440300", [item["slug"] for item in repo.get_added_cities()])
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_delete_search_history_does_not_remove_city_library_entry(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-test-history", "测试城", "ceshicheng", 31.2, 121.5)
+                repo.add_city_record(city, province="测试省", country="中国")
+                repo.add_search_history(city, province="测试省", country="中国")
+
+                response = app.test_client().post(
+                    "/search-history/delete",
+                    data={"slug": city.slug, "name": city.name, "date": "2026-05-31", **DEFAULT_PREFERENCES},
+                )
+
+                self.assertEqual(response.status_code, 302)
+                self.assertNotIn(city.slug, [item["slug"] for item in repo.get_search_history()])
+                self.assertIn(city.slug, [item["slug"] for item in repo.get_added_cities()])
             finally:
                 database.DB_PATH = original_db_path
 

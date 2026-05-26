@@ -151,9 +151,10 @@ def _build_homepage_context_cached(
         aqi_available=aqi_available,
         history_daily_df=history_daily_df,
     )
+    chart_rows = ranking[:10]
     chart_data = {
-        "cities": [row["city_name"] for row in ranking],
-        "scores": [row["score_total"] for row in ranking],
+        "cities": [row["city_name"] for row in chart_rows],
+        "scores": [row["score_total"] for row in chart_rows],
     }
     return {
         "ranking": ranking,
