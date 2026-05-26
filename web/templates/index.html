@@ -32,7 +32,7 @@
 </section>
 
 <section class="search-hero card">
-    <form method="get" action="{{ url_for('home') }}" class="search-hero-form" data-city-suggest-form data-city-search-url="{{ url_for('city_search_api') }}">
+    <form method="get" action="{{ url_for('home') }}" class="search-hero-form" data-city-suggest-form data-city-search-url="{{ url_for('city_search_api') }}" data-city-refresh-url="{{ url_for('refresh_city') }}">
         <div class="search-input-row">
             <div class="city-suggest-field">
                 <input id="city-search-input" type="text" name="q" value="{{ search_query }}" placeholder="找不到你的目标城市？搜索一下！" autocomplete="off" data-city-suggest-input>
@@ -55,15 +55,13 @@
             {% elif search_results %}
                 <div class="city-name-list">
                     {% for result in search_results %}
-                    <form method="get" action="{{ url_for('home') }}">
-                        <input type="hidden" name="q" value="{{ search_query }}">
-                        <input type="hidden" name="candidate_slug" value="{{ result.slug }}">
-                        <input type="hidden" name="candidate_name" value="{{ result.name }}">
-                        <input type="hidden" name="candidate_latitude" value="{{ result.latitude }}">
-                        <input type="hidden" name="candidate_longitude" value="{{ result.longitude }}">
-                        <input type="hidden" name="candidate_province" value="{{ result.province }}">
-                        <input type="hidden" name="candidate_country" value="{{ result.country }}">
-                        <input type="hidden" name="candidate_display_name" value="{{ result.display_name }}">
+                    <form method="post" action="{{ url_for('refresh_city') }}">
+                        <input type="hidden" name="slug" value="{{ result.slug }}">
+                        <input type="hidden" name="name" value="{{ result.name }}">
+                        <input type="hidden" name="latitude" value="{{ result.latitude }}">
+                        <input type="hidden" name="longitude" value="{{ result.longitude }}">
+                        <input type="hidden" name="province" value="{{ result.province }}">
+                        <input type="hidden" name="country" value="{{ result.country }}">
                         {% for key, value in preferences.items() %}
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
@@ -98,6 +96,7 @@
                 {% for key, value in preferences.items() %}
                     <input type="hidden" name="{{ key }}" value="{{ value }}">
                 {% endfor %}
+                <input type="hidden" name="date" value="{{ selected_date }}">
                 <button type="submit" class="button button-primary">添加城市</button>
             </form>
         </div>

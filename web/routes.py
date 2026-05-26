@@ -298,6 +298,7 @@ def register_routes(app: Flask) -> None:
     @app.post("/city/refresh")
     def refresh_city():
         preferences = normalize_preferences(request.form)
+        date_text = request.form.get("date") or request.args.get("date") or ""
         city = city_from_search_payload(request.form)
         result = refresh_city_data(city)
         repository = WeatherRepository()
@@ -310,7 +311,7 @@ def register_routes(app: Flask) -> None:
             flash(result["message"], "warning")
         else:
             flash(f"{city.name} 数据刷新完成。", "success")
-        return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences))
+        return redirect(url_for("city_detail", city_slug=city.slug) + "?" + _query_string(preferences, {"date": date_text}))
 
     @app.get("/api/cities/search")
     def city_search_api():

@@ -177,6 +177,32 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         mocked_search.assert_called_once_with("广", include_remote=False)
 
+    def test_refresh_city_redirects_to_detail_with_selected_date(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                with mock.patch("web.routes.refresh_city_data", return_value={"errors": [], "message": "ok"}):
+                    response = app.test_client().post(
+                        "/city/refresh",
+                        data={
+                            "slug": "geo-1809858",
+                            "name": "广州",
+                            "latitude": "23.11667",
+                            "longitude": "113.25",
+                            "province": "广东",
+                            "country": "中国",
+                            "date": "2026-05-24",
+                            **DEFAULT_PREFERENCES,
+                        },
+                    )
+
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("/city/geo-1809858", response.headers["Location"])
+                self.assertIn("date=2026-05-24", response.headers["Location"])
+            finally:
+                database.DB_PATH = original_db_path
+
     def test_knn_model_predicts_score(self) -> None:
         import pandas as pd
 
