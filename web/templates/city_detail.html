@@ -52,7 +52,7 @@
 </section>
 
 {% if selected.ml_weather %}
-<section class="content-grid">
+<section>
     <div class="card">
         <div class="section-head"><h2>历史机器学习预测天气</h2><span>{{ selected.date }}</span></div>
         <ul class="meta-list">
@@ -64,18 +64,6 @@
             <li><span>预测风速</span><strong>{{ selected.ml_weather.wind_speed_kmh }} km/h</strong></li>
             <li><span>预测风力</span><strong>{{ selected.ml_weather.wind_level }} 级</strong></li>
             <li><span>预测天气评分</span><strong>{{ selected.ml_score }}</strong></li>
-        </ul>
-    </div>
-    <div class="card">
-        <div class="section-head"><h2>计算路径</h2><span>先预测天气，再评分</span></div>
-        <p>
-            模型使用历史日天气训练，按城市和年内日期寻找相似样本，并结合最近 60 天温度、降雨、风速趋势预测未来天气。
-            预测过程不再读取未来预报温度，API 预报只作为对照曲线和基础天气展示。
-        </p>
-        <ul class="tag-list">
-            <li>API天气规则分 {{ selected.rule_score }}</li>
-            <li>历史ML预测天气评分 {{ selected.ml_score }}</li>
-            <li>置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
         </ul>
     </div>
 </section>
