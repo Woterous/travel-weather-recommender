@@ -133,12 +133,28 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertIn("广州", names)
         self.assertIn("广陵", names)
 
+    def test_city_search_can_skip_remote_lookup_for_suggestions(self) -> None:
+        class FailingClient:
+            def get_json(self, _url):
+                raise RuntimeError("remote search should not run")
+
+        results = search_cities("广陵", client=FailingClient(), include_remote=False)
+
+        self.assertEqual(results[0]["name"], "广陵")
+
     def test_city_search_api_returns_json_results(self) -> None:
         with mock.patch("web.routes.search_cities", return_value=[{"name": "广州", "slug": "geo-1809858"}]):
             response = app.test_client().get("/api/cities/search?q=广")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["results"][0]["name"], "广州")
+
+    def test_city_search_api_supports_local_only_suggestions(self) -> None:
+        with mock.patch("web.routes.search_cities", return_value=[]) as mocked_search:
+            response = app.test_client().get("/api/cities/search?q=广&local_only=1")
+
+        self.assertEqual(response.status_code, 200)
+        mocked_search.assert_called_once_with("广", include_remote=False)
 
     def test_knn_model_predicts_score(self) -> None:
         import pandas as pd

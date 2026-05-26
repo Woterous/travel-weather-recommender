@@ -318,7 +318,8 @@ def register_routes(app: Flask) -> None:
         if not query:
             return jsonify({"results": []})
         try:
-            return jsonify({"results": search_cities(query)})
+            include_remote = request.args.get("local_only") != "1"
+            return jsonify({"results": search_cities(query, include_remote=include_remote)})
         except Exception as exc:
             return jsonify({"results": [], "error": f"城市联想暂时不可用：{exc}"}), 200
 

@@ -167,6 +167,117 @@ function initAssistant() {
 
 document.addEventListener("DOMContentLoaded", initAssistant);
 
+function initCitySuggestions() {
+    const form = document.querySelector("[data-city-suggest-form]");
+    if (!form) return;
+
+    const input = form.querySelector("[data-city-suggest-input]");
+    const list = form.querySelector("[data-city-suggest-list]");
+    const searchUrl = form.dataset.citySearchUrl;
+    if (!input || !list || !searchUrl) return;
+
+    const cache = new Map();
+    let debounceTimer = null;
+    let controller = null;
+
+    function clearCandidates(params) {
+        [
+            "candidate_slug",
+            "candidate_name",
+            "candidate_latitude",
+            "candidate_longitude",
+            "candidate_province",
+            "candidate_country",
+            "candidate_display_name"
+        ].forEach((key) => params.delete(key));
+    }
+
+    function selectCity(city) {
+        const target = new URL(form.action || window.location.pathname, window.location.origin);
+        const params = new URLSearchParams(window.location.search);
+        clearCandidates(params);
+        params.set("q", input.value.trim());
+        params.set("candidate_slug", city.slug || "");
+        params.set("candidate_name", city.name || "");
+        params.set("candidate_latitude", city.latitude || "");
+        params.set("candidate_longitude", city.longitude || "");
+        params.set("candidate_province", city.province || "");
+        params.set("candidate_country", city.country || "");
+        params.set("candidate_display_name", city.display_name || city.name || "");
+        target.search = params.toString();
+        window.location.href = target.toString();
+    }
+
+    function renderSuggestions(results) {
+        list.innerHTML = "";
+        if (!results.length) {
+            list.hidden = true;
+            return;
+        }
+        results.forEach((city) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.textContent = city.name;
+            button.addEventListener("mousedown", (event) => {
+                event.preventDefault();
+                selectCity(city);
+            });
+            list.appendChild(button);
+        });
+        list.hidden = false;
+    }
+
+    async function fetchSuggestions(query) {
+        if (cache.has(query)) {
+            renderSuggestions(cache.get(query));
+            return;
+        }
+        if (controller) controller.abort();
+        controller = new AbortController();
+        const params = new URLSearchParams({ q: query, local_only: "1" });
+        try {
+            const response = await fetch(`${searchUrl}?${params}`, { signal: controller.signal });
+            const payload = await response.json();
+            const results = Array.isArray(payload.results) ? payload.results : [];
+            cache.set(query, results);
+            renderSuggestions(results);
+        } catch (error) {
+            if (error.name !== "AbortError") {
+                list.hidden = true;
+            }
+        }
+    }
+
+    input.addEventListener("input", () => {
+        const query = input.value.trim();
+        window.clearTimeout(debounceTimer);
+        if (!query) {
+            list.hidden = true;
+            return;
+        }
+        debounceTimer = window.setTimeout(() => fetchSuggestions(query), 120);
+    });
+
+    input.addEventListener("focus", () => {
+        const query = input.value.trim();
+        if (query && cache.has(query)) {
+            renderSuggestions(cache.get(query));
+        }
+    });
+
+    input.addEventListener("blur", () => {
+        window.setTimeout(() => {
+            list.hidden = true;
+        }, 120);
+    });
+
+    form.addEventListener("submit", () => {
+        list.hidden = true;
+    });
+}
+
+document.addEventListener("DOMContentLoaded", initCitySuggestions);
+
 function initRefreshProgress() {
     const form = document.querySelector(".refresh-form");
     const modal = document.querySelector("[data-refresh-modal]");

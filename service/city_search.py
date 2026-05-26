@@ -8,14 +8,25 @@ from crawler.fetcher import HttpClient
 
 
 CURATED_CITY_SUGGESTIONS = [
+    CityConfig("geo-1792947", "天津", "tianjin", 39.14222, 117.17667),
     CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25),
     CityConfig("geo-1811720", "广元", "guangyuan", 32.44201, 105.823),
     CityConfig("geo-1812256", "广安", "guangan", 30.47413, 106.63696),
     CityConfig("geo-10179231", "广陵", "guangling", 32.39358, 119.43157),
     CityConfig("geo-1806466", "广德", "guangde", 30.89371, 119.41705),
+    CityConfig("geo-1799962", "武汉", "wuhan", 30.58333, 114.26667),
+    CityConfig("geo-1791247", "深圳", "shenzhen", 22.54554, 114.0683),
+    CityConfig("geo-1796236", "沈阳", "shenyang", 41.79222, 123.43278),
+    CityConfig("geo-1808722", "哈尔滨", "haerbin", 45.75, 126.65),
+    CityConfig("geo-1816670", "石家庄", "shijiazhuang", 38.04139, 114.47861),
     CityConfig("geo-1814906", "长沙", "changsha", 28.19874, 112.97087),
     CityConfig("geo-1795565", "苏州", "suzhou", 31.30408, 120.59538),
-    CityConfig("geo-1816670", "深圳", "shenzhen", 22.54554, 114.0683),
+    CityConfig("geo-1815286", "成都", "chengdu", 30.66667, 104.06667),
+    CityConfig("geo-1812545", "大连", "dalian", 38.91222, 121.60222),
+    CityConfig("geo-1805757", "昆明", "kunming", 25.03889, 102.71833),
+    CityConfig("geo-1804651", "拉萨", "lasa", 29.65, 91.1),
+    CityConfig("geo-1808926", "桂林", "guilin", 25.28194, 110.28639),
+    CityConfig("geo-1809461", "贵阳", "guiyang", 26.58333, 106.71667),
 ]
 
 
@@ -60,7 +71,7 @@ def _city_from_geocoding_record(record: dict) -> CityConfig:
     )
 
 
-def search_cities(query: str, client: HttpClient | None = None) -> list[dict]:
+def search_cities(query: str, client: HttpClient | None = None, include_remote: bool = True) -> list[dict]:
     cleaned = query.strip()
     if not cleaned:
         return []
@@ -78,7 +89,7 @@ def search_cities(query: str, client: HttpClient | None = None) -> list[dict]:
 
     local_matches = fixed_matches + curated_matches
     has_exact_local_match = any(item["name"].lower() == cleaned.lower() for item in local_matches)
-    should_search_remote = len(cleaned) > 1 and not has_exact_local_match
+    should_search_remote = include_remote and len(cleaned) > 1 and not has_exact_local_match
 
     payload = {"results": []}
     if should_search_remote:
