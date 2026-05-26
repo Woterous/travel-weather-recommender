@@ -35,7 +35,7 @@
             {% endif %}
         {% endwith %}
 
-        <main class="main-content page-transition">
+        <main class="main-content page-transition" data-route-path="{{ request.path }}" data-route-search="{{ request.query_string.decode() }}">
             {% block content %}{% endblock %}
         </main>
     </div>

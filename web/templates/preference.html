@@ -7,6 +7,9 @@
     <div class="hero-copy">
         <p class="eyebrow">偏好设置页</p>
         <h1>偏好设置</h1>
+        <div class="hero-actions">
+            <button type="button" class="button button-primary" data-smart-back data-fallback-url="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date) }}">返回上一页</button>
+        </div>
     </div>
 </section>
 

@@ -227,6 +227,7 @@ function initCitySuggestions() {
         params.set("longitude", city.longitude || "");
         params.set("province", city.province || "");
         params.set("country", city.country || "");
+        params.set("return_to", `${window.location.pathname}${window.location.search || ""}#search`);
         target.search = params.toString();
         if (window.navigateWithinApp) {
             window.navigateWithinApp(target.toString());
@@ -450,10 +451,10 @@ function initCityAutoload() {
         if (event.redirect_url && ["done", "warning"].includes(event.status)) {
             window.setTimeout(() => {
                 if (window.navigateWithinApp) {
-                    window.navigateWithinApp(event.redirect_url, { preserveScroll: true });
+                    window.navigateWithinApp(event.redirect_url, { preserveScroll: true, replaceHistory: true });
                     return;
                 }
-                window.location.href = event.redirect_url;
+                window.location.replace(event.redirect_url);
             }, 700);
         }
     }
@@ -735,6 +736,61 @@ function initAutoSubmitSelects() {
     });
 }
 
+function initFloatingDateSwitchers() {
+    document.querySelectorAll(".floating-date-switcher").forEach((form) => {
+        if (form.dataset.floatingDateReady === "1") return;
+        form.dataset.floatingDateReady = "1";
+        const toggle = form.querySelector(".floating-date-handle");
+        if (!toggle) return;
+
+        toggle.addEventListener("click", () => {
+            form.classList.toggle("open");
+            const selectButton = form.querySelector(".custom-select-button");
+            if (form.classList.contains("open") && selectButton) {
+                window.setTimeout(() => selectButton.focus({ preventScroll: true }), 80);
+            }
+        });
+    });
+}
+
+function initSmartBackButtons() {
+    document.querySelectorAll("[data-smart-back]").forEach((button) => {
+        if (button.dataset.smartBackReady === "1") return;
+        button.dataset.smartBackReady = "1";
+        button.addEventListener("click", () => {
+            const fallback = button.dataset.fallbackUrl || "/";
+            const routeMismatch = renderedRouteBase().startsWith("/city/") && !window.location.pathname.startsWith("/city/");
+            const useStoredSource = button.dataset.useStoredSource === "1";
+            const target =
+                button.dataset.returnUrl ||
+                (useStoredSource ? sessionStorage.getItem("tw:lastDetailSourceUrl") : "") ||
+                (useStoredSource ? sessionStorage.getItem("tw:lastSearchUrl") : "") ||
+                (button.dataset.preferFallback === "1" || routeMismatch ? fallback : "");
+            if (target) {
+                if (window.navigateWithinApp) {
+                    window.navigateWithinApp(target, { restoreScroll: true, replaceHistory: button.dataset.preferFallback === "1" });
+                    return;
+                }
+                if (button.dataset.preferFallback === "1") {
+                    window.location.replace(target);
+                    return;
+                }
+                window.location.href = target;
+                return;
+            }
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            if (window.navigateWithinApp) {
+                window.navigateWithinApp(fallback);
+                return;
+            }
+            window.location.href = fallback;
+        });
+    });
+}
+
 function initScrollExperience() {
     if (typeof TW_APP.scrollCleanup === "function") {
         TW_APP.scrollCleanup();
@@ -815,6 +871,29 @@ function replaceFlashStack(nextDocument) {
     }
 }
 
+function routeKey(url) {
+    const parsed = new URL(url, window.location.href);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+}
+
+function renderedRouteBase() {
+    const main = document.querySelector(".main-content");
+    if (!main || !main.dataset.routePath) {
+        const parsed = new URL(TW_APP.currentUrl || window.location.href, window.location.href);
+        return `${parsed.pathname}${parsed.search}`;
+    }
+    const search = main.dataset.routeSearch ? `?${main.dataset.routeSearch}` : "";
+    return `${main.dataset.routePath}${search}`;
+}
+
+function rememberDetailSource(targetUrl) {
+    const target = new URL(targetUrl, window.location.href);
+    const current = new URL(TW_APP.currentUrl || window.location.href, window.location.href);
+    if (!target.pathname.startsWith("/city/")) return;
+    if (current.pathname.startsWith("/city/")) return;
+    sessionStorage.setItem("tw:lastDetailSourceUrl", `${current.pathname}${current.search}${current.hash || ""}`);
+}
+
 async function navigateWithinApp(url, options = {}) {
     const target = new URL(url, window.location.href);
     if (target.origin !== window.location.origin) {
@@ -822,14 +901,14 @@ async function navigateWithinApp(url, options = {}) {
         return false;
     }
 
-    const sameDocument =
-        target.pathname === window.location.pathname &&
-        target.search === window.location.search &&
-        target.hash;
+    const sameDocument = `${target.pathname}${target.search}` === renderedRouteBase() && target.hash;
     if (sameDocument) {
         const anchor = document.querySelector(target.hash);
         if (anchor) anchor.scrollIntoView({ behavior: "smooth", block: "start" });
-        history.pushState({}, "", target.toString());
+        if (routeKey(target.toString()) !== routeKey(window.location.href)) {
+            history.pushState({}, "", target.toString());
+        }
+        TW_APP.currentUrl = target.toString();
         return true;
     }
 
@@ -848,6 +927,7 @@ async function navigateWithinApp(url, options = {}) {
     if (main) main.classList.add("is-route-loading");
 
     try {
+        rememberDetailSource(target.toString());
         const response = await fetch(target.toString(), {
             headers: {
                 "Accept": "text/html",
@@ -878,6 +958,8 @@ async function navigateWithinApp(url, options = {}) {
         document.title = nextDocument.title || document.title;
         replaceFlashStack(nextDocument);
         currentMain.className = nextMain.className;
+        currentMain.dataset.routePath = nextMain.dataset.routePath || target.pathname;
+        currentMain.dataset.routeSearch = nextMain.dataset.routeSearch || target.search.replace(/^\?/, "");
         currentMain.innerHTML = nextMain.innerHTML;
         currentMain.classList.remove("page-transition");
         void currentMain.offsetWidth;
@@ -946,6 +1028,15 @@ function initEnhancedNavigation() {
         navigateWithinApp(target.toString());
     });
 
+    document.addEventListener("click", (event) => {
+        if (!(event.target instanceof Element)) return;
+        document.querySelectorAll(".floating-date-switcher.open").forEach((form) => {
+            if (!form.contains(event.target)) {
+                form.classList.remove("open");
+            }
+        });
+    });
+
     document.addEventListener("submit", (event) => {
         const form = event.target;
         if (!(form instanceof HTMLFormElement) || form.dataset.noPjax === "1") return;
@@ -970,11 +1061,16 @@ function initEnhancedNavigation() {
 }
 
 function initPage() {
+    if (window.location.pathname === "/" && window.location.search.includes("q=")) {
+        sessionStorage.setItem("tw:lastSearchUrl", `${window.location.pathname}${window.location.search}#search`);
+    }
     initCitySuggestions();
     initRefreshProgress();
     initCityAutoload();
     initPreferenceSliders();
     initAutoSubmitSelects();
+    initFloatingDateSwitchers();
+    initSmartBackButtons();
     initScrollExperience();
 }
 
