@@ -440,9 +440,11 @@ class WeatherRepository:
             SELECT
                 COALESCE((SELECT MAX(crawl_time) FROM forecast_daily), '') AS forecast_version,
                 COALESCE((SELECT MAX(crawl_time) FROM history_daily), '') AS history_version,
+                COALESCE((SELECT MAX(crawl_time) FROM history_monthly), '') AS history_monthly_version,
                 COALESCE((SELECT MAX(added_time) FROM added_cities), '') AS added_city_version,
                 COALESCE((SELECT COUNT(*) FROM forecast_daily), 0) AS forecast_rows,
                 COALESCE((SELECT COUNT(*) FROM history_daily), 0) AS history_rows,
+                COALESCE((SELECT COUNT(*) FROM history_monthly), 0) AS history_monthly_rows,
                 COALESCE((SELECT COUNT(*) FROM added_cities), 0) AS added_city_rows
             """
         )
@@ -450,8 +452,9 @@ class WeatherRepository:
             return "empty"
         row = df.iloc[0]
         return (
-            f"{row['forecast_version']}|{row['history_version']}|{row['added_city_version']}|"
-            f"{row['forecast_rows']}|{row['history_rows']}|{row['added_city_rows']}"
+            f"{row['forecast_version']}|{row['history_version']}|{row['history_monthly_version']}|"
+            f"{row['added_city_version']}|{row['forecast_rows']}|{row['history_rows']}|"
+            f"{row['history_monthly_rows']}|{row['added_city_rows']}"
         )
 
     def get_latest_refresh_info(self) -> dict:

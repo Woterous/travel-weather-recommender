@@ -9,6 +9,22 @@ from crawler.parser_utils import infer_rain_flag, normalize_weather_type
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 PROCESSED_DIR = BASE_DIR / "data" / "processed"
+UNIVERSAL_MILD_TEMP = 22.0
+
+
+def _add_adaptive_comfort_flag(city_daily: pd.DataFrame) -> pd.DataFrame:
+    city_daily = city_daily.copy()
+    city_daily["month_num"] = city_daily["date"].dt.month
+    monthly_avg = city_daily.groupby(["city_slug", "month_num"])["avg_temp"].transform("mean")
+    monthly_std = city_daily.groupby(["city_slug", "month_num"])["avg_temp"].transform("std").fillna(0.0)
+
+    adaptive_center = monthly_avg * 0.70 + UNIVERSAL_MILD_TEMP * 0.30
+    half_width = (5.0 + monthly_std * 0.25).clip(lower=5.0, upper=7.0)
+    lower_bound = adaptive_center - half_width
+    upper_bound = adaptive_center + half_width
+
+    city_daily["comfortable_flag"] = city_daily["avg_temp"].between(lower_bound, upper_bound, inclusive="both").astype(int)
+    return city_daily
 
 
 def build_forecast_dataset(
@@ -108,9 +124,8 @@ def build_history_monthly_dataset(daily_payloads: dict, crawl_time: str) -> pd.D
         city_daily["min_temp"] = pd.to_numeric(city_daily["min_temp"], errors="coerce")
         city_daily["wind_speed_kmh"] = pd.to_numeric(city_daily["wind_speed_kmh"], errors="coerce")
         city_daily["rain_flag"] = city_daily["precipitation_mm"].ge(0.1).astype(int)
-        city_daily["comfortable_flag"] = city_daily["avg_temp"].between(18, 26, inclusive="both").astype(int)
         city_daily["month_key"] = city_daily["date"].dt.to_period("M").astype(str)
-        city_daily["month_num"] = city_daily["date"].dt.month
+        city_daily = _add_adaptive_comfort_flag(city_daily)
 
         monthly = (
             city_daily.groupby(["city_slug", "city_name", "month_key", "month_num"], as_index=False)

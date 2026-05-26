@@ -16,7 +16,7 @@ from config.pinyin import city_name_to_pinyin
 from config.preferences import DEFAULT_PREFERENCES
 from service.city_search import city_from_search_payload
 from service.city_search import search_cities
-from service.clean_data import build_forecast_dataset, build_history_daily_dataset
+from service.clean_data import build_forecast_dataset, build_history_daily_dataset, build_history_monthly_dataset
 from crawler.forecast_crawler import fetch_forecast_page
 from service.database import _sanitize_refresh_message
 from service import database
@@ -505,6 +505,31 @@ class SearchAndModelTest(unittest.TestCase):
         self.assertEqual(len(df), 1)
         self.assertEqual(int(df.iloc[0]["month_num"]), 5)
         self.assertEqual(int(df.iloc[0]["rain_flag"]), 0)
+
+    def test_history_monthly_uses_adaptive_city_month_comfort(self) -> None:
+        payloads = {
+            "beijing": {
+                "records": [
+                    {
+                        "city_slug": "beijing",
+                        "city_name": "北京",
+                        "date": f"2026-01-{day:02d}",
+                        "max_temp": avg_temp + 4,
+                        "min_temp": avg_temp - 4,
+                        "avg_temp": avg_temp,
+                        "precipitation_mm": 0,
+                        "wind_speed_kmh": 10,
+                    }
+                    for day, avg_temp in enumerate([-10, -5, 1, 4, 9], start=1)
+                ]
+            }
+        }
+
+        df = build_history_monthly_dataset(payloads, "2026-05-26T10:00:00")
+        ratio = float(df.iloc[0]["comfortable_days_ratio"])
+
+        self.assertGreater(ratio, 0.0)
+        self.assertLess(ratio, 1.0)
 
 
 class RefreshProgressTest(unittest.TestCase):
