@@ -288,7 +288,8 @@ class SearchAndModelTest(unittest.TestCase):
                 text = response.data.decode("utf-8")
                 self.assertIn("中国·河北省·唐山市·玉田县", text)
                 self.assertIn("当前天气", text)
-                self.assertIn("添加城市", text)
+                self.assertIn("查看详情", text)
+                self.assertNotIn("添加城市</button>", text)
                 mocked_refresh.assert_not_called()
                 self.assertNotIn("cn-130229", [item["slug"] for item in database.WeatherRepository().get_added_cities()])
             finally:
@@ -358,7 +359,36 @@ class SearchAndModelTest(unittest.TestCase):
 
                 self.assertEqual(events[-1]["status"], "done")
                 self.assertIn("/city/cn-440300", events[-1]["redirect_url"])
+                self.assertIn("name=%E6%B7%B1%E5%9C%B3", events[-1]["redirect_url"])
+                self.assertIn("latitude=22.546054", events[-1]["redirect_url"])
                 self.assertNotIn("Working outside", events[-1]["message"])
+                self.assertNotIn("cn-440300", [item["slug"] for item in database.WeatherRepository().get_added_cities()])
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_add_city_to_library_requires_explicit_detail_action(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                response = app.test_client().post(
+                    "/city/add",
+                    data={
+                        "slug": "cn-440300",
+                        "name": "深圳",
+                        "latitude": "22.546054",
+                        "longitude": "114.025974",
+                        "province": "广东省",
+                        "country": "中国",
+                        "date": "2026-05-31",
+                        **DEFAULT_PREFERENCES,
+                    },
+                )
+
+                self.assertEqual(response.status_code, 302)
+                self.assertIn("/city/cn-440300", response.headers["Location"])
+                self.assertIn("date=2026-05-31", response.headers["Location"])
+                self.assertIn("cn-440300", [item["slug"] for item in database.WeatherRepository().get_added_cities()])
             finally:
                 database.DB_PATH = original_db_path
 

@@ -124,12 +124,12 @@
                     {% elif preview_error %}
                     <li><span>天气预览</span><strong>{{ preview_error }}</strong></li>
                     {% else %}
-                    <li><span>天气预览</span><strong>暂不可用，添加后会完整抓取。</strong></li>
+                    <li><span>天气预览</span><strong>暂不可用，进入详情页后会完整加载。</strong></li>
                     {% endif %}
                 </ul>
-                <p class="muted">点击添加后才会抓取完整未来天气、历史天气并保存到城市库。</p>
-                <form method="post" action="{{ url_for('refresh_city') }}" class="add-city-form">
-                    <input type="hidden" name="slug" value="{{ selected_search_city.slug }}">
+                <p class="muted">先进入详情页查看完整天气、历史样本和推荐评分；需要保留时可在详情页加入城市库。</p>
+                <form method="get" action="{{ url_for('city_detail', city_slug=selected_search_city.slug) }}" class="add-city-form">
+                    <input type="hidden" name="autoload" value="1">
                     <input type="hidden" name="name" value="{{ selected_search_city.name }}">
                     <input type="hidden" name="latitude" value="{{ selected_search_city.latitude }}">
                     <input type="hidden" name="longitude" value="{{ selected_search_city.longitude }}">
@@ -139,7 +139,7 @@
                         <input type="hidden" name="{{ key }}" value="{{ value }}">
                     {% endfor %}
                     <input type="hidden" name="date" value="{{ selected_date }}">
-                    <button type="submit" class="button button-primary">添加城市</button>
+                    <button type="submit" class="button button-primary">查看详情</button>
                 </form>
             </div>
             {% endif %}

@@ -525,6 +525,7 @@ select {
 }
 
 .city-name-list form,
+.inline-action-form,
 .inline-delete-form {
     margin: 0;
 }
