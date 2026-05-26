@@ -17,7 +17,6 @@
         <ul class="meta-list">
             <li><span>数据状态</span><strong>{{ latest_refresh.status }}</strong></li>
             <li><span>最近更新时间</span><strong>{{ latest_refresh.refresh_time }}</strong></li>
-            <li><span>AQI 模式</span><strong>{{ "已启用" if aqi_available else "无 AQI 模式" }}</strong></li>
             <li><span>当前日期</span><strong>{{ selected_date or "暂无数据" }}</strong></li>
         </ul>
         <form method="post" action="{{ url_for('refresh') }}" class="refresh-form">
