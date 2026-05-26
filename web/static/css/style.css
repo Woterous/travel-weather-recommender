@@ -410,6 +410,8 @@ select {
 }
 
 .search-stage {
+    position: relative;
+    z-index: 14;
     min-height: 0;
     align-content: start;
 }
@@ -459,7 +461,10 @@ select {
     left: 0;
     z-index: 12;
     display: grid;
-    overflow: hidden;
+    max-height: min(340px, calc(100vh - 220px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     border: 1px solid var(--line);
     border-radius: 22px;
     background: rgba(255, 255, 255, 0.98);
