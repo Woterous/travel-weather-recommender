@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_date_switcher.html" import floating_date_switcher %}
 
 {% block title %}{{ city.name }} 详情 | Travel Weather{% endblock %}
 
@@ -9,7 +10,7 @@
         <h1>{{ city.name }}</h1>
         <p>查看指定日期的推荐结论、基础天气、机器学习预测、未来趋势和历史月度表现。</p>
         <div class="hero-actions">
-            <button type="button" class="button button-primary" onclick="history.back()">返回上一页</button>
+            <button type="button" class="button button-primary" data-smart-back data-use-stored-source="1" data-return-url="{{ request.args.get('return_to', '') }}" data-fallback-url="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date, q=request.args.get('name', city.name)) }}#search" {% if request.args.get('autoload') == '1' %}data-prefer-fallback="1"{% endif %}>返回上一页</button>
             {% if selected and not city_in_library and can_add_city_to_library %}
             <form method="post" action="{{ url_for('add_city_to_library') }}" class="inline-action-form">
                 <input type="hidden" name="slug" value="{{ city.slug }}">
@@ -28,18 +29,18 @@
             <a class="button button-ghost" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=city.slug, city_b='beijing' if city.slug != 'beijing' else 'shanghai') }}">加入对比</a>
         </div>
     </div>
-    <form method="get" action="{{ url_for('city_detail', city_slug=city.slug) }}" class="hero-meta filter-form" data-auto-submit-form>
-        <h3>切换日期</h3>
-        <select name="date" aria-label="切换日期">
-            {% for date_item in available_dates %}
-                <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
-            {% endfor %}
-        </select>
-        {% for key, value in preferences.items() %}
-            <input type="hidden" name="{{ key }}" value="{{ value }}">
-        {% endfor %}
-    </form>
 </section>
+
+{% call floating_date_switcher(url_for('city_detail', city_slug=city.slug), selected_date, available_dates, preferences, city.name) %}
+    {% for key in ["name", "latitude", "longitude", "province", "country"] %}
+        {% if request.args.get(key) %}
+            <input type="hidden" name="{{ key }}" value="{{ request.args.get(key) }}">
+        {% endif %}
+    {% endfor %}
+    {% if request.args.get("return_to") %}
+        <input type="hidden" name="return_to" value="{{ request.args.get('return_to') }}">
+    {% endif %}
+{% endcall %}
 
 {% if selected %}
 <section class="product-section">
@@ -204,6 +205,9 @@
         {% for key, value in preferences.items() %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endfor %}
+        {% if request.args.get("return_to") %}
+            <input type="hidden" name="return_to" value="{{ request.args.get('return_to') }}">
+        {% endif %}
         <input type="hidden" name="date" value="{{ selected_date }}">
     </form>
 </section>

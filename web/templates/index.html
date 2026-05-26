@@ -1,8 +1,11 @@
 {% extends "base.html" %}
+{% from "_date_switcher.html" import floating_date_switcher %}
 
 {% block title %}全国城市旅游出行推荐 | Travel Weather{% endblock %}
 
 {% block content %}
+{% call floating_date_switcher(url_for('home'), selected_date, available_dates, preferences, "首页推荐") %}{% endcall %}
+
 <section class="product-hero">
     <div class="hero-copy">
         <p class="eyebrow">Travel Intelligence</p>
@@ -89,6 +92,7 @@
                             <input type="hidden" name="longitude" value="{{ result.longitude }}">
                             <input type="hidden" name="province" value="{{ result.province }}">
                             <input type="hidden" name="country" value="{{ result.country }}">
+                            <input type="hidden" name="return_to" value="{{ request.full_path }}#search">
                             {% for key, value in preferences.items() %}
                                 <input type="hidden" name="{{ key }}" value="{{ value }}">
                             {% endfor %}
@@ -135,6 +139,7 @@
                     <input type="hidden" name="longitude" value="{{ selected_search_city.longitude }}">
                     <input type="hidden" name="province" value="{{ selected_search_city.province }}">
                     <input type="hidden" name="country" value="{{ selected_search_city.country }}">
+                    <input type="hidden" name="return_to" value="{{ request.full_path }}#search">
                     {% for key, value in preferences.items() %}
                         <input type="hidden" name="{{ key }}" value="{{ value }}">
                     {% endfor %}
@@ -172,27 +177,12 @@
     <div class="section-intro split">
         <div>
             <p class="section-kicker">Personalized Model</p>
-            <h2 class="section-title">偏好、日期和模型状态集中在一屏。</h2>
+            <h2 class="section-title">偏好和模型状态集中在一屏。</h2>
         </div>
-        <p class="section-lead">保留所有筛选能力，但把后台式面板整理成更轻的判断依据。</p>
+        <p class="section-lead">保留筛选能力，把后台式面板整理成更轻的判断依据。</p>
     </div>
 
     <div class="controls-grid home-controls-grid">
-        <form id="date-controls" method="get" action="{{ url_for('home') }}" class="card filter-form home-date-card" data-auto-submit-form>
-            <div class="date-card-head">
-                <span>Travel Date</span>
-                <h3>选择日期</h3>
-            </div>
-            <select name="date" aria-label="选择日期">
-                {% for date_item in available_dates %}
-                    <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
-                {% endfor %}
-            </select>
-            {% for key, value in preferences.items() %}
-                <input type="hidden" name="{{ key }}" value="{{ value }}">
-            {% endfor %}
-        </form>
-
         <div class="card">
             <h3>模型状态</h3>
             <ul class="weight-list">

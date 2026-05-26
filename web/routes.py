@@ -404,6 +404,7 @@ def register_routes(app: Flask) -> None:
         city = city_from_search_payload(request.form)
         province = request.form.get("province", "")
         country = request.form.get("country", "")
+        return_to = request.form.get("return_to", "")
         city_detail_path = url_for("city_detail", city_slug=city.slug)
         job_id = refresh_jobs.create()
 
@@ -423,6 +424,7 @@ def register_routes(app: Flask) -> None:
                         "longitude": city.longitude,
                         "province": province,
                         "country": country,
+                        "return_to": return_to or None,
                     },
                 )
                 refresh_jobs.emit(

@@ -1,21 +1,24 @@
 {% extends "base.html" %}
+{% from "_date_switcher.html" import floating_date_switcher %}
 
 {% block title %}城市对比 | 旅行天气推荐系统{% endblock %}
 
 {% block content %}
+{% call floating_date_switcher(url_for('compare_page'), selected_date, available_dates, preferences, "城市对比") %}
+    <input type="hidden" name="city_a" value="{{ city_a }}">
+    <input type="hidden" name="city_b" value="{{ city_b }}">
+{% endcall %}
+
 <section class="hero-panel compact">
     <div class="hero-copy">
         <p class="eyebrow">城市对比页</p>
         <h1>双城市对比</h1>
         <p>对比总分、天气维度和历史月度表现。</p>
+        <div class="hero-actions">
+            <button type="button" class="button button-primary" data-smart-back data-fallback-url="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date) }}">返回上一页</button>
+        </div>
     </div>
     <form method="get" action="{{ url_for('compare_page') }}" class="card filter-form" data-auto-submit-form>
-        <label>日期</label>
-        <select name="date" aria-label="日期">
-            {% for date_item in available_dates %}
-                <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
-            {% endfor %}
-        </select>
         <label>城市 A</label>
         <select name="city_a" aria-label="城市 A">
             {% for city in city_options %}
@@ -31,6 +34,7 @@
         {% for key, value in preferences.items() %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endfor %}
+        <input type="hidden" name="date" value="{{ selected_date }}">
     </form>
 </section>
 

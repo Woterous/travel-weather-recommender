@@ -1,0 +1,28 @@
+{% macro floating_date_switcher(action_url, selected_date, available_dates, preferences, label="当前页面") -%}
+<form method="get" action="{{ action_url }}" class="floating-date-switcher filter-form" data-auto-submit-form aria-label="固定日期切换">
+    <button type="button" class="floating-date-handle" aria-label="打开日期切换">
+        <span class="floating-date-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" focusable="false">
+                <path d="M7 3v4"></path>
+                <path d="M17 3v4"></path>
+                <path d="M4 9h16"></path>
+                <rect x="4" y="5" width="16" height="16" rx="3"></rect>
+            </svg>
+        </span>
+        <span class="floating-date-value">{{ selected_date[5:] if selected_date else "日期" }}</span>
+    </button>
+    <div class="floating-date-panel">
+        <span class="floating-date-kicker">切换日期</span>
+        <strong>{{ label }}</strong>
+        <select name="date" aria-label="固定切换日期">
+            {% for date_item in available_dates %}
+                <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    {% for key, value in preferences.items() %}
+        <input type="hidden" name="{{ key }}" value="{{ value }}">
+    {% endfor %}
+    {% if caller is defined %}{{ caller() }}{% endif %}
+</form>
+{%- endmacro %}

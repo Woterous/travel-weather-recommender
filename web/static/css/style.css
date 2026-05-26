@@ -28,6 +28,10 @@ html {
     scroll-behavior: smooth;
 }
 
+html.is-route-loading {
+    cursor: progress;
+}
+
 body {
     margin: 0;
     color: var(--ink);
@@ -155,6 +159,12 @@ select {
     display: grid;
     gap: 78px;
     margin-top: 38px;
+    transition: opacity 180ms var(--ease);
+}
+
+.main-content.is-route-loading {
+    opacity: 0.46;
+    pointer-events: none;
 }
 
 .page-transition {
@@ -832,14 +842,151 @@ input[type="text"]:focus {
     z-index: 80;
 }
 
-.filter-form[data-auto-submit-form].select-open {
+.filter-form[data-auto-submit-form].select-open:not(.floating-date-switcher) {
     position: relative;
     z-index: 100;
 }
 
 .filter-form[data-auto-submit-form].is-submitting {
-    opacity: 0.82;
     pointer-events: none;
+    cursor: progress;
+}
+
+.floating-date-switcher {
+    position: fixed;
+    top: 50%;
+    right: max(22px, calc((100vw - 1180px) / 2 - 84px));
+    z-index: 25;
+    display: block;
+    transform: translateY(-50%);
+}
+
+.floating-date-switcher.select-open {
+    position: fixed;
+    z-index: 28;
+}
+
+.floating-date-switcher::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 100%;
+    width: 18px;
+    height: calc(100% + 48px);
+    transform: translateY(-50%);
+}
+
+.floating-date-handle {
+    width: 58px;
+    min-height: 116px;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 10px;
+    padding: 10px 7px;
+    border: 1px solid rgba(255, 255, 255, 0.86);
+    border-radius: 22px;
+    color: #17202c;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 252, 0.88));
+    box-shadow: 0 18px 48px rgba(18, 27, 38, 0.16);
+    backdrop-filter: blur(18px) saturate(1.25);
+    cursor: pointer;
+    transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), border-color 180ms var(--ease), background 180ms var(--ease);
+}
+
+.floating-date-handle:hover,
+.floating-date-handle:focus {
+    transform: translateX(-2px);
+    border-color: rgba(11, 108, 255, 0.28);
+    background: #fff;
+    box-shadow: 0 22px 58px rgba(18, 27, 38, 0.2);
+    outline: none;
+}
+
+.floating-date-icon {
+    width: 34px;
+    height: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 14px;
+    color: #fff;
+    background: linear-gradient(135deg, var(--brand), #198bdc);
+    box-shadow: 0 10px 22px rgba(11, 108, 255, 0.24);
+}
+
+.floating-date-icon svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.floating-date-value {
+    writing-mode: vertical-rl;
+    color: #263140;
+    font-size: 0.82rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    font-variant-numeric: tabular-nums;
+}
+
+.floating-date-panel {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 12px);
+    width: 268px;
+    display: grid;
+    gap: 10px;
+    padding: 18px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    border-radius: 24px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.97), rgba(247, 250, 252, 0.9));
+    box-shadow: 0 24px 64px rgba(18, 27, 38, 0.18);
+    backdrop-filter: blur(20px) saturate(1.3);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(10px, -50%) scale(0.98);
+    transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+}
+
+.floating-date-switcher:hover .floating-date-panel,
+.floating-date-switcher:focus-within .floating-date-panel,
+.floating-date-switcher.open .floating-date-panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(0, -50%) scale(1);
+}
+
+.floating-date-kicker {
+    color: var(--brand-strong);
+    font-size: 0.75rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.floating-date-panel strong {
+    font-size: 1rem;
+}
+
+.floating-date-panel .custom-select-button {
+    min-height: 48px;
+    padding: 10px 14px;
+    border-radius: 16px;
+}
+
+.floating-date-panel .custom-select-menu {
+    max-height: 280px;
+    overflow: auto;
+}
+
+.home-controls-grid > .card:only-child {
+    grid-column: 1 / -1;
 }
 
 .home-date-card {
@@ -1879,11 +2026,9 @@ input[type="text"]:focus {
 @keyframes pageEnter {
     from {
         opacity: 0;
-        transform: translateY(14px);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
@@ -1992,6 +2137,67 @@ input[type="text"]:focus {
         left: auto;
         width: auto;
         margin: 16px;
+    }
+
+    .floating-date-switcher,
+    .floating-date-switcher.select-open {
+        top: auto;
+        right: 88px;
+        bottom: 16px;
+        left: 16px;
+        z-index: 23;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.78);
+        border-radius: 26px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 16px 44px rgba(18, 27, 38, 0.16);
+        backdrop-filter: blur(18px) saturate(1.25);
+        transform: none;
+    }
+
+    .floating-date-handle {
+        width: 48px;
+        min-height: 48px;
+        padding: 0;
+        border-radius: 18px;
+    }
+
+    .floating-date-value {
+        display: none;
+    }
+
+    .floating-date-panel {
+        position: static;
+        width: auto;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+        backdrop-filter: none;
+    }
+
+    .floating-date-switcher:hover .floating-date-panel,
+    .floating-date-switcher:focus-within .floating-date-panel,
+    .floating-date-switcher.open .floating-date-panel {
+        transform: none;
+    }
+
+    .floating-date-kicker,
+    .floating-date-panel strong {
+        display: none;
+    }
+
+    .floating-date-panel .custom-select-button {
+        min-height: 48px;
+        border-radius: 18px;
     }
 
     .search-input-row,
