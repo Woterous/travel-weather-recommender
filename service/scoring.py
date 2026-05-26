@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+from config.weights import LITERATURE_BASED_WEIGHTS_NO_AQI, LITERATURE_BASED_WEIGHTS_WITH_AQI
 
-DEFAULT_WEIGHTS_NO_AQI = {
-    "temperature": 0.30,
-    "rain": 0.25,
-    "wind": 0.10,
-    "weather": 0.10,
-    "history": 0.25,
-}
+
+def _safe_float(value, default: float | None = None) -> float | None:
+    if value is None:
+        return default
+    try:
+        numeric = float(value)
+    except (TypeError, ValueError):
+        return default
+    if numeric != numeric:
+        return default
+    return numeric
 
 
 def _normalize_weights(weights: dict, aqi_available: bool) -> dict:
@@ -20,7 +25,7 @@ def _normalize_weights(weights: dict, aqi_available: bool) -> dict:
 
 
 def build_weights(preferences: dict, aqi_available: bool = False) -> dict:
-    weights = dict(DEFAULT_WEIGHTS_NO_AQI)
+    weights = dict(LITERATURE_BASED_WEIGHTS_WITH_AQI if aqi_available else LITERATURE_BASED_WEIGHTS_NO_AQI)
     if preferences["rain_sensitivity"] == "high":
         weights["rain"] += 0.08
         weights["history"] += 0.02
@@ -57,10 +62,22 @@ def build_weights(preferences: dict, aqi_available: bool = False) -> dict:
         weights["weather"] -= 0.03
         weights["rain"] -= 0.03
 
+    if aqi_available:
+        if preferences["aqi_sensitivity"] == "high":
+            weights["aqi"] += 0.05
+            weights["temperature"] -= 0.02
+            weights["history"] -= 0.02
+            weights["weather"] -= 0.01
+        elif preferences["aqi_sensitivity"] == "low":
+            weights["aqi"] -= 0.04
+            weights["temperature"] += 0.02
+            weights["weather"] += 0.02
+
     return _normalize_weights(weights, aqi_available=aqi_available)
 
 
 def score_temperature(avg_temp: float | None, preference: str) -> float:
+    avg_temp = _safe_float(avg_temp)
     if avg_temp is None:
         return 50.0
     bands = {
@@ -75,7 +92,7 @@ def score_temperature(avg_temp: float | None, preference: str) -> float:
 
 
 def score_rain(row: dict, rain_sensitivity: str) -> float:
-    precipitation = float(row.get("precipitation_mm") or 0.0)
+    precipitation = _safe_float(row.get("precipitation_mm"), 0.0) or 0.0
     detail = row.get("weather_detail", "")
     if precipitation >= 25 or "暴雨" in detail or "大雨" in detail:
         base = 10
@@ -96,8 +113,8 @@ def score_rain(row: dict, rain_sensitivity: str) -> float:
 
 
 def score_wind(row: dict, wind_sensitivity: str, travel_style: str) -> float:
-    level = row.get("wind_level")
-    speed = float(row.get("wind_speed_kmh") or 0.0)
+    level = _safe_float(row.get("wind_level"))
+    speed = _safe_float(row.get("wind_speed_kmh"), 0.0) or 0.0
     if level is None:
         if speed <= 12:
             base = 100
@@ -156,21 +173,24 @@ def score_weather(row: dict, travel_style: str) -> float:
 def score_history(history_baseline: dict | None) -> float:
     if not history_baseline:
         return 60.0
-    comfortable_component = float(history_baseline.get("comfortable_days_ratio", 0.0)) * 55
-    rain_component = (1 - float(history_baseline.get("rainy_ratio", 0.0))) * 25
-    temp_std = float(history_baseline.get("temp_std", 0.0))
+    comfortable_ratio = _safe_float(history_baseline.get("comfortable_days_ratio"), 0.0) or 0.0
+    rainy_ratio = _safe_float(history_baseline.get("rainy_ratio"), 0.0) or 0.0
+    temp_std = _safe_float(history_baseline.get("temp_std"), 0.0) or 0.0
+    comfortable_component = comfortable_ratio * 55
+    rain_component = (1 - rainy_ratio) * 25
     stability_component = max(0, (1 - min(temp_std, 12) / 12)) * 20
     return round(min(100, comfortable_component + rain_component + stability_component), 1)
 
 
 def score_aqi(aqi_value: float | None, preference: str) -> float:
-    if aqi_value is None:
+    numeric_aqi = _safe_float(aqi_value)
+    if numeric_aqi is None:
         return 0.0
-    if aqi_value <= 50:
+    if numeric_aqi <= 50:
         base = 100
-    elif aqi_value <= 100:
+    elif numeric_aqi <= 100:
         base = 85
-    elif aqi_value <= 150:
+    elif numeric_aqi <= 150:
         base = 60
     else:
         base = 30

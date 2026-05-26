@@ -5,7 +5,8 @@ from datetime import date
 from bs4 import BeautifulSoup
 
 from config.cities import CityConfig
-from config.sources import build_forecast_api_url, build_forecast_page_url
+from config.sources import build_forecast_api_url
+from config.pinyin import city_name_to_pinyin, is_tianqi_slug
 from crawler.fetcher import HttpClient
 from crawler.parser_utils import (
     cn_md_to_iso,
@@ -17,13 +18,34 @@ from crawler.parser_utils import (
 )
 
 
+def _forecast_page_urls(city: CityConfig) -> list[str]:
+    candidates = [city.pinyin, city.slug, city_name_to_pinyin(city.name)]
+    seen = set()
+    urls = []
+    for candidate in candidates:
+        if not is_tianqi_slug(candidate) or candidate in seen:
+            continue
+        seen.add(candidate)
+        urls.append(f"https://www.tianqi.com/{candidate}/")
+    return urls
+
+
 def fetch_forecast_page(city: CityConfig, client: HttpClient | None = None) -> dict:
     http_client = client or HttpClient()
-    url = build_forecast_page_url(city)
-    html = http_client.get_text(url)
-    soup = BeautifulSoup(html, "html.parser")
-    block = soup.select_one("div.day7.hide.twty_hour")
-    if block is None:
+    last_error: Exception | None = None
+    for url in _forecast_page_urls(city):
+        try:
+            html = http_client.get_text(url)
+            soup = BeautifulSoup(html, "html.parser")
+            block = soup.select_one("div.day7.hide.twty_hour")
+            if block is not None:
+                break
+            last_error = ValueError(f"未找到 {city.name} 的 7 日天气模块")
+        except Exception as exc:
+            last_error = exc
+    else:
+        if last_error:
+            raise last_error
         raise ValueError(f"未找到 {city.name} 的 7 日天气模块")
 
     date_nodes = block.select("ul.week li b")

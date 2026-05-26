@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from config.cities import CityConfig
 
@@ -31,6 +32,29 @@ def build_forecast_api_url(city: CityConfig) -> str:
     )
 
 
+def build_air_quality_api_url(city: CityConfig) -> str:
+    return (
+        "https://air-quality-api.open-meteo.com/v1/air-quality"
+        f"?latitude={city.latitude}"
+        f"&longitude={city.longitude}"
+        "&hourly=us_aqi,pm2_5,pm10,ozone,nitrogen_dioxide,sulphur_dioxide,carbon_monoxide"
+        "&forecast_days=5"
+        "&timezone=Asia%2FShanghai"
+    )
+
+
+def build_geocoding_api_url(query: str, count: int = 8) -> str:
+    params = urlencode(
+        {
+            "name": query,
+            "count": count,
+            "language": "zh",
+            "format": "json",
+        }
+    )
+    return f"https://geocoding-api.open-meteo.com/v1/search?{params}"
+
+
 def build_history_api_url(city: CityConfig, start_date: date, end_date: date) -> str:
     return (
         "https://archive-api.open-meteo.com/v1/archive"
@@ -47,5 +71,5 @@ def default_history_range(today: date | None = None) -> tuple[date, date]:
     reference_today = today or date.today()
     first_day_of_current_month = reference_today.replace(day=1)
     end_date = first_day_of_current_month - timedelta(days=1)
-    start_date = date(end_date.year - 2, 1, 1)
+    start_date = date(end_date.year - 5, 1, 1)
     return start_date, end_date

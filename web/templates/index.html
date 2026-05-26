@@ -6,18 +6,13 @@
 <section class="hero-panel">
     <div class="hero-copy">
         <p class="eyebrow">首页兼排行榜页</p>
-        <h1>固定 10 城市的旅游出行推荐</h1>
-        <p>
-            页面默认读取本地 SQLite 数据，不会在每次访问时实时抓取。
-            需要更新数据时，使用右侧的手动刷新按钮。
-        </p>
+        <h1>全国城市的旅游出行推荐</h1>
     </div>
     <div class="hero-meta card">
         <h3>当前状态</h3>
         <ul class="meta-list">
             <li><span>数据状态</span><strong>{{ latest_refresh.status }}</strong></li>
             <li><span>最近更新时间</span><strong>{{ latest_refresh.refresh_time }}</strong></li>
-            <li><span>AQI 模式</span><strong>{{ "已启用" if aqi_available else "无 AQI 模式" }}</strong></li>
             <li><span>当前日期</span><strong>{{ selected_date or "暂无数据" }}</strong></li>
         </ul>
         <form method="post" action="{{ url_for('refresh') }}" class="refresh-form">
@@ -29,6 +24,104 @@
         </form>
         <p class="muted">{{ latest_refresh.message }}</p>
     </div>
+</section>
+
+<section class="search-hero card">
+    <form method="get" action="{{ url_for('home') }}" class="search-hero-form" data-city-suggest-form data-city-search-url="{{ url_for('city_search_api') }}" data-city-refresh-url="{{ url_for('refresh_city') }}">
+        <div class="search-input-row">
+            <div class="city-suggest-field">
+                <input id="city-search-input" type="text" name="q" value="{{ search_query }}" placeholder="找不到你的目标城市？搜索一下！" autocomplete="off" data-city-suggest-input>
+                <div class="city-suggest-list" data-city-suggest-list hidden></div>
+            </div>
+            <button type="submit" class="button button-primary">搜索城市</button>
+        </div>
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <input type="hidden" name="date" value="{{ selected_date }}">
+    </form>
+
+    {% if search_query %}
+    <div class="city-search-panel">
+        <div>
+            <h3>搜索结果</h3>
+            {% if search_error %}
+                <p class="muted">{{ search_error }}</p>
+            {% elif search_results %}
+                <div class="city-name-list">
+                    {% for result in search_results %}
+                    <form method="get" action="{{ url_for('city_detail', city_slug=result.slug) }}">
+                        <input type="hidden" name="autoload" value="1">
+                        <input type="hidden" name="name" value="{{ result.name }}">
+                        <input type="hidden" name="latitude" value="{{ result.latitude }}">
+                        <input type="hidden" name="longitude" value="{{ result.longitude }}">
+                        <input type="hidden" name="province" value="{{ result.province }}">
+                        <input type="hidden" name="country" value="{{ result.country }}">
+                        {% for key, value in preferences.items() %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endfor %}
+                        <input type="hidden" name="date" value="{{ selected_date }}">
+                        <button type="submit">
+                            <span>{{ result.name }}</span>
+                            {% if result.display_name %}<small>{{ result.display_name }}</small>{% endif %}
+                        </button>
+                    </form>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="muted">没有找到匹配城市，可以尝试输入更完整的城市名。</p>
+            {% endif %}
+        </div>
+
+        {% if selected_search_city %}
+        <div class="selected-city-box">
+            <div class="section-head">
+                <h3>{{ selected_search_city.name }}</h3>
+                <span>{{ selected_search_city.country or "未知地区" }}</span>
+            </div>
+            <ul class="meta-list">
+                <li><span>城市</span><strong>{{ selected_search_city.display_name }}</strong></li>
+                <li><span>纬度</span><strong>{{ selected_search_city.latitude }}</strong></li>
+                <li><span>经度</span><strong>{{ selected_search_city.longitude }}</strong></li>
+                {% if preview_weather and preview_weather.forecast %}
+                <li><span>预览日期</span><strong>{{ preview_weather.forecast.date }}</strong></li>
+                <li><span>当前天气</span><strong>{{ preview_weather.forecast.weather_detail }}</strong></li>
+                <li><span>平均温</span><strong>{{ preview_weather.forecast.avg_temp }}℃</strong></li>
+                <li><span>降水量</span><strong>{{ preview_weather.forecast.precipitation_mm }} mm</strong></li>
+                <li><span>风力</span><strong>{{ preview_weather.forecast.wind_level if preview_weather.forecast.wind_level is not none else "-" }} 级</strong></li>
+                {% elif preview_error %}
+                <li><span>天气预览</span><strong>{{ preview_error }}</strong></li>
+                {% else %}
+                <li><span>天气预览</span><strong>暂不可用，添加后会完整抓取。</strong></li>
+                {% endif %}
+            </ul>
+            <p class="muted">点击添加后才会抓取完整未来天气、历史天气并保存到城市库。</p>
+            <form method="post" action="{{ url_for('refresh_city') }}" class="add-city-form">
+                <input type="hidden" name="slug" value="{{ selected_search_city.slug }}">
+                <input type="hidden" name="name" value="{{ selected_search_city.name }}">
+                <input type="hidden" name="latitude" value="{{ selected_search_city.latitude }}">
+                <input type="hidden" name="longitude" value="{{ selected_search_city.longitude }}">
+                <input type="hidden" name="province" value="{{ selected_search_city.province }}">
+                <input type="hidden" name="country" value="{{ selected_search_city.country }}">
+                {% for key, value in preferences.items() %}
+                    <input type="hidden" name="{{ key }}" value="{{ value }}">
+                {% endfor %}
+                <input type="hidden" name="date" value="{{ selected_date }}">
+                <button type="submit" class="button button-primary">添加城市</button>
+            </form>
+        </div>
+        {% endif %}
+    </div>
+    {% endif %}
+
+    {% if added_cities %}
+    <div class="added-city-row">
+        <span>已添加城市</span>
+        {% for item in added_cities[:8] %}
+            <a href="{{ url_for('city_detail', city_slug=item.slug) }}?{{ query_with(preferences, date=selected_date) }}">{{ item.name }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
 </section>
 
 <section class="controls-grid">
@@ -53,12 +146,27 @@
             <li>{{ preference_label("temperature_preference", preferences["temperature_preference"]) }}</li>
             <li>{{ preference_label("wind_sensitivity", preferences["wind_sensitivity"]) }}</li>
             <li>{{ preference_label("travel_style", preferences["travel_style"]) }}</li>
+            {% if aqi_available %}
+            <li>{{ preference_label("aqi_sensitivity", preferences["aqi_sensitivity"]) }}</li>
+            {% endif %}
         </ul>
         <a class="button button-ghost" href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date) }}">调整偏好</a>
     </div>
 
     <div class="card">
-        <h3>权重预览</h3>
+        <h3>模型状态</h3>
+        <ul class="weight-list">
+            <li><span>模型</span><strong>{{ model_summary.name }}</strong></li>
+            <li><span>训练样本</span><strong>{{ model_summary.sample_count }}</strong></li>
+            <li><span>训练来源</span><strong>历史日天气 + 近60天趋势</strong></li>
+            <li><span>预测目标</span><strong>温度 / 降雨概率 / 风力</strong></li>
+        </ul>
+    </div>
+</section>
+
+<section class="controls-grid">
+    <div class="card">
+        <h3>论文权重预览</h3>
         <ul class="weight-list">
             {% for key, value in weights_preview.items() %}
                 <li>
@@ -78,6 +186,56 @@
 </section>
 
 {% if ranking %}
+{% if ml_predictions %}
+<section class="ml-prediction-panel card">
+    <div class="section-head">
+        <div>
+            <p class="eyebrow">机器学习预测</p>
+            <h2>历史数据驱动的出行天气预测</h2>
+        </div>
+        <span>{{ selected_date }}</span>
+    </div>
+    {% set primary_ml = ml_predictions[0] %}
+    <div class="ml-primary">
+        <div>
+            <span class="rank-badge">ML Top 1</span>
+            <h3>{{ primary_ml.city_name }}</h3>
+            <p>
+                {{ primary_ml.ml_weather.weather_detail }} ·
+                预测均温 {{ "%.1f"|format(primary_ml.ml_weather.avg_temp) }}℃ ·
+                预测降雨概率 {{ "%.0f%%"|format(primary_ml.ml_weather.rain_probability * 100) }}
+            </p>
+        </div>
+        <div class="ml-score-box">
+            <span>预测天气评分</span>
+            <strong>{{ primary_ml.ml_score }}</strong>
+            <small>置信度 {{ "%.0f%%"|format(primary_ml.ml_confidence * 100) }}</small>
+        </div>
+    </div>
+    <div class="ml-weather-grid">
+        {% for row in ml_predictions %}
+        <article class="ml-weather-item">
+            <div class="city-card-head">
+                <h3>#{{ loop.index }} {{ row.city_name }}</h3>
+                <span>{{ row.ml_score }}</span>
+            </div>
+            <ul class="weather-metrics">
+                <li><span>预测天气</span><strong>{{ row.ml_weather.weather_detail }}</strong></li>
+                <li><span>预测平均温度</span><strong>{{ "%.1f"|format(row.ml_weather.avg_temp) }}℃</strong></li>
+                <li><span>预测降雨概率</span><strong>{{ "%.0f%%"|format(row.ml_weather.rain_probability * 100) }}</strong></li>
+                <li><span>预测风力</span><strong>{{ row.ml_weather.wind_level }} 级</strong></li>
+                {% if aqi_available %}
+                <li><span>AQI</span><strong>{{ aqi_display(row.ml_weather.aqi) }}</strong></li>
+                {% endif %}
+                <li><span>置信度</span><strong>{{ "%.0f%%"|format(row.ml_confidence * 100) }}</strong></li>
+            </ul>
+            <p class="muted">推荐分 {{ row.score_total }} 由历史 ML 预测天气重新代入论文权重计算；API 预报规则分 {{ row.rule_score }} 仅作对照。</p>
+        </article>
+        {% endfor %}
+    </div>
+</section>
+{% endif %}
+
 <section class="content-grid">
     <div class="card chart-card">
         <div class="section-head">
@@ -88,11 +246,10 @@
     </div>
     <div class="card ranking-card">
         <div class="section-head">
-            <h2>Top 10 城市</h2>
-            <span>展示本地缓存结果</span>
+            <h2>推荐前 10 城市</h2>
         </div>
         <ol class="ranking-list">
-            {% for row in ranking %}
+            {% for row in ranking[:10] %}
             <li class="ranking-row">
                 <div>
                     <strong>#{{ row.rank }} {{ row.city_name }}</strong>
@@ -108,22 +265,73 @@
     </div>
 </section>
 
+{% endif %}
+{% if city_catalog %}
+<section class="section-head">
+    <div>
+        <h2>当前城市库</h2>
+        <p class="muted">城市库可自由添加或删除；有当前日期天气数据的城市会显示评分。</p>
+    </div>
+    <span>{{ city_catalog|length }} 个城市</span>
+</section>
 <section class="city-grid">
-    {% for row in ranking %}
+    {% for row in city_catalog %}
     <article class="city-card">
         <div class="city-card-head">
-            <h3>{{ row.city_name }}</h3>
-            <span>#{{ row.rank }}</span>
+            <h3>{{ row.city_name if row.has_score else row.name }}</h3>
+            <span>{{ "#" ~ row.rank if row.has_score else row.source_label }}</span>
         </div>
+        {% if row.has_score %}
         <p class="weather-line">{{ row.weather_detail }} · 均温 {{ "%.1f"|format(row.avg_temp) }}℃</p>
-        <p class="muted">风力 {{ row.wind_level if row.wind_level is not none else "-" }} 级 · {{ "有雨" if row.rain_flag else "少雨" }}</p>
+        <p class="muted">
+            风力 {{ row.wind_level if row.wind_level is not none else "-" }} 级 ·
+            {{ "有雨" if row.rain_flag else "少雨" }}
+            {% if aqi_available %} · AQI {{ aqi_display(row.aqi) }}{% endif %}
+        </p>
+        <p class="muted">API规则分 {{ row.rule_score }} · 预测天气评分 {{ row.ml_score if row.ml_score is not none else "-" }} · 置信度 {{ "%.0f%%"|format(row.ml_confidence * 100) }}</p>
         <div class="city-card-foot">
             <strong class="score-big">{{ row.score_total }}</strong>
             <div class="card-actions">
                 <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.city_slug) }}?{{ query_with(preferences, date=selected_date) }}">查看详情</a>
                 <a class="button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b='beijing' if row.city_slug != 'beijing' else 'shanghai') }}">加入对比</a>
+                {% if row.is_custom %}
+                <form method="post" action="{{ url_for('delete_city') }}" class="inline-delete-form" onsubmit="return confirm('确定从城市库删除 {{ row.city_name }} 吗？');">
+                    <input type="hidden" name="slug" value="{{ row.city_slug }}">
+                    <input type="hidden" name="name" value="{{ row.city_name }}">
+                    {% for key, value in preferences.items() %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                    <input type="hidden" name="date" value="{{ selected_date }}">
+                    <button type="submit" class="button button-danger">删除</button>
+                </form>
+                {% endif %}
             </div>
         </div>
+        {% else %}
+        <p class="weather-line">暂无 {{ selected_date }} 的天气评分</p>
+        {% if row.available_date %}
+        <p class="muted">这个城市已有 {{ row.available_date }} 的预报数据；当前筛选日期没有记录，切换日期即可参与排行。</p>
+        {% else %}
+        <p class="muted">这个城市已经在城市库中，但还没有可用预报数据。点击详情或重新添加刷新后会生成可排行数据。</p>
+        {% endif %}
+        <div class="city-card-foot">
+            <strong class="score-big">-</strong>
+            <div class="card-actions">
+                <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.slug) }}?{{ query_with(preferences, date=row.available_date or selected_date) }}">查看详情</a>
+                {% if row.is_custom %}
+                <form method="post" action="{{ url_for('delete_city') }}" class="inline-delete-form" onsubmit="return confirm('确定从城市库删除 {{ row.name }} 吗？');">
+                    <input type="hidden" name="slug" value="{{ row.slug }}">
+                    <input type="hidden" name="name" value="{{ row.name }}">
+                    {% for key, value in preferences.items() %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                    <input type="hidden" name="date" value="{{ selected_date }}">
+                    <button type="submit" class="button button-danger">删除</button>
+                </form>
+                {% endif %}
+            </div>
+        </div>
+        {% endif %}
     </article>
     {% endfor %}
 </section>

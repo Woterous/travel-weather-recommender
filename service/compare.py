@@ -1,16 +1,36 @@
 from __future__ import annotations
 
+import pandas as pd
+
 from service.history_analysis import get_city_history_series
 from service.ranking import build_ranked_records, label_map
 
 
 def build_compare_context(repository, city_a: str, city_b: str, selected_date: str, preferences: dict) -> dict:
     history_df = repository.get_history_monthly()
+    daily_frames = [
+        frame
+        for frame in [repository.get_history_daily(city_a), repository.get_history_daily(city_b)]
+        if not frame.empty
+    ]
+    history_daily_df = pd.concat(daily_frames, ignore_index=True) if daily_frames else pd.DataFrame()
     aqi_available = repository.aqi_available()
     forecast_a = repository.get_city_forecast(city_a)
     forecast_b = repository.get_city_forecast(city_b)
-    scored_a = build_ranked_records(forecast_a, history_df, preferences, aqi_available=aqi_available)
-    scored_b = build_ranked_records(forecast_b, history_df, preferences, aqi_available=aqi_available)
+    scored_a = build_ranked_records(
+        forecast_a,
+        history_df,
+        preferences,
+        aqi_available=aqi_available,
+        history_daily_df=history_daily_df,
+    )
+    scored_b = build_ranked_records(
+        forecast_b,
+        history_df,
+        preferences,
+        aqi_available=aqi_available,
+        history_daily_df=history_daily_df,
+    )
     row_a = next((row for row in scored_a if row["date"] == selected_date), None)
     row_b = next((row for row in scored_b if row["date"] == selected_date), None)
 

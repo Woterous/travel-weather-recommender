@@ -40,6 +40,41 @@
         </main>
     </div>
 
+    <section class="ai-assistant" aria-label="全局 AI 助手">
+        <button class="ai-toggle" type="button" data-ai-toggle>AI</button>
+        <div class="ai-panel" data-ai-panel>
+            <div class="ai-panel-head">
+                <strong>全局 AI 助手</strong>
+                <button type="button" data-ai-toggle>×</button>
+            </div>
+            <div class="ai-messages" data-ai-messages>
+                <div class="ai-message assistant">可以问我：今天推荐哪个城市？北京 AQI 怎么样？</div>
+            </div>
+            <form class="ai-form" data-ai-form>
+                <input type="text" name="message" placeholder="输入问题">
+                <button type="submit">发送</button>
+            </form>
+        </div>
+    </section>
+
+    <section class="refresh-progress-modal" data-refresh-modal aria-live="polite">
+        <div class="refresh-progress-card">
+            <div class="section-head">
+                <h2>数据刷新进度</h2>
+                <span data-refresh-percent>0%</span>
+            </div>
+            <div class="progress-bar">
+                <span data-refresh-bar></span>
+            </div>
+            <ol class="progress-steps" data-refresh-steps>
+                <li class="active">等待开始刷新</li>
+            </ol>
+            <p class="muted" data-refresh-message>正在准备刷新任务。</p>
+            <p class="muted" data-refresh-next>下一步：连接进度通道。</p>
+            <button class="button button-primary" type="button" data-refresh-close>关闭</button>
+        </div>
+    </section>
+
     <script src="{{ url_for('static', filename='js/app.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>

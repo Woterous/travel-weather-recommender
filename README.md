@@ -14,8 +14,12 @@
 ## 功能范围
 
 - 固定 10 城市未来天气推荐
-- 历史月度统计分析
-- 规则型旅游适宜度评分
+- 免费 Open-Meteo Air Quality API 接入 AQI 空气质量
+- 免费 Open-Meteo Geocoding API 支持全城搜索
+- 历史日天气训练与月度统计分析
+- 参考旅游气候指数论文的规则型旅游适宜度评分
+- 基于历史日样本和近 60 天趋势的 KNN 天气预测
+- 全局 AI 助手接口占位，当前基于本地数据回答
 - 偏好设置
 - 首页兼排行榜
 - 城市详情
@@ -27,7 +31,7 @@
 - 页面默认只读取本地 SQLite
 - 不会在每次打开页面时实时抓取
 - 未来天气通过手动刷新更新
-- 历史月度统计长期保存在本地
+- 历史日样本和月度统计长期保存在本地
 - 抓取失败时保留最近一次成功数据
 
 ## 安装依赖
@@ -46,10 +50,18 @@ python scripts/crawl_all.py
 
 - 抓取未来天气网页数据
 - 使用公开 API 补充未来天气风力与降水字段
-- 获取历史归档数据并聚合为月度统计
+- 使用免费 Open-Meteo Air Quality API 补充 AQI 空气质量字段
+- 获取约 5 年历史归档数据，保存历史日样本并聚合为月度统计
 - 保存原始 JSON
 - 生成处理后的 CSV
 - 写入 `data/db/weather_recommender.sqlite3`
+
+## 城市搜索与 AI 助手
+
+- 首页支持城市搜索，搜索结果来自免费 Open-Meteo Geocoding API。
+- 搜索结果可单独刷新，不需要每次刷新全部城市。
+- 页面右下角提供全局 AI 助手入口，当前调用 `/api/assistant`，基于本地 SQLite 推荐结果回答问题。
+- 后续接入外部大模型时，可在 `service/ai_assistant.py` 中实现 `TRAVEL_AI_ENDPOINT` 和 `TRAVEL_AI_API_KEY` 对应调用。
 
 ## 启动项目
 
@@ -74,3 +86,7 @@ data/       原始数据、处理数据、SQLite
 scripts/    手动执行脚本
 docs/       需求、执行规范、验收清单、页面草图
 ```
+
+## 评分依据
+
+评分权重说明见 `docs/aqi-and-weight-basis.md`。

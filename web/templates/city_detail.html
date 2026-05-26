@@ -34,17 +34,51 @@
             <li><span>平均温</span><strong>{{ selected.avg_temp }}℃</strong></li>
             <li><span>风力等级</span><strong>{{ selected.wind_level if selected.wind_level is not none else "-" }}</strong></li>
             <li><span>降雨</span><strong>{{ "有" if selected.rain_flag else "低风险" }}</strong></li>
+            {% if aqi_available %}
+            <li><span>AQI</span><strong>{{ aqi_display(selected.aqi) }}</strong></li>
+            {% endif %}
         </ul>
     </div>
     <div class="card">
         <div class="section-head"><h2>推荐结论</h2><span>总分 {{ selected.score_total }}</span></div>
         <p>{{ selected.reason }}</p>
         <ul class="tag-list">
-            <li>{{ "无 AQI 模式" if not aqi_available else "AQI 已启用" }}</li>
+            <li>API规则分 {{ selected.rule_score }}</li>
+            <li>历史ML预测评分 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
+            <li>模型置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
             <li>最近刷新 {{ latest_refresh.refresh_time }}</li>
         </ul>
     </div>
 </section>
+
+{% if selected.ml_weather %}
+<section>
+    <div class="card">
+        <div class="section-head"><h2>历史机器学习预测天气</h2><span>{{ selected.date }}</span></div>
+        <ul class="meta-list">
+            <li><span>预测天气</span><strong>{{ selected.ml_weather.weather_detail }}</strong></li>
+            <li><span>预测最高温</span><strong>{{ selected.ml_weather.max_temp }}℃</strong></li>
+            <li><span>预测最低温</span><strong>{{ selected.ml_weather.min_temp }}℃</strong></li>
+            <li><span>预测平均温</span><strong>{{ selected.ml_weather.avg_temp }}℃</strong></li>
+            <li><span>预测降雨概率</span><strong>{{ "%.0f%%"|format(selected.ml_weather.rain_probability * 100) }}</strong></li>
+            <li><span>预测风速</span><strong>{{ selected.ml_weather.wind_speed_kmh }} km/h</strong></li>
+            <li><span>预测风力</span><strong>{{ selected.ml_weather.wind_level }} 级</strong></li>
+            <li><span>预测天气评分</span><strong>{{ selected.ml_score }}</strong></li>
+        </ul>
+    </div>
+</section>
+
+<section class="content-grid">
+    <div class="card chart-card">
+        <div class="section-head"><h2>预测温度对比</h2><span>未来 7 天</span></div>
+        <div id="ml-temp-chart" class="chart"></div>
+    </div>
+    <div class="card chart-card">
+        <div class="section-head"><h2>天气评分对比</h2><span>近 7 天</span></div>
+        <div id="ml-weather-chart" class="chart"></div>
+    </div>
+</section>
+{% endif %}
 
 <section class="content-grid">
     <div class="card chart-card">
@@ -67,15 +101,36 @@
         </ul>
     </div>
     <div class="card chart-card">
-        <div class="section-head"><h2>历史趋势</h2><span>月度适宜度</span></div>
+        <div class="section-head"><h2>历史趋势</h2><span>近12个月适宜度与平滑趋势</span></div>
         <div id="history-chart" class="chart"></div>
     </div>
+</section>
+{% else %}
+{% if autoload_city %}
+<section class="empty-state card" data-city-autoload data-refresh-url="{{ url_for('refresh_city_start') }}">
+    <h2>正在加载 {{ city.name }} 的天气数据</h2>
+    <p data-city-load-message>已进入城市详情页，正在后台抓取未来天气和历史样本。</p>
+    <div class="progress-bar"><span data-city-load-bar></span></div>
+    <p class="muted" data-city-load-percent>0%</p>
+    <form data-city-load-form>
+        <input type="hidden" name="slug" value="{{ city.slug }}">
+        <input type="hidden" name="name" value="{{ city.name }}">
+        <input type="hidden" name="latitude" value="{{ city.latitude }}">
+        <input type="hidden" name="longitude" value="{{ city.longitude }}">
+        <input type="hidden" name="province" value="{{ request.args.get('province', '') }}">
+        <input type="hidden" name="country" value="{{ request.args.get('country', '') }}">
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <input type="hidden" name="date" value="{{ selected_date }}">
+    </form>
 </section>
 {% else %}
 <section class="empty-state card">
     <h2>当前日期没有可展示的城市详情</h2>
     <p>先刷新数据，或者切换到存在数据的日期。</p>
 </section>
+{% endif %}
 {% endif %}
 {% endblock %}
 
@@ -95,10 +150,29 @@ window.renderLineChart("trend-chart", {
     ],
     title: "未来趋势"
 });
+window.renderLineChart("ml-temp-chart", {
+    labels: {{ ml_weather_chart["dates"] | tojson }},
+    series: [
+        { name: "API预报均温", values: {{ ml_weather_chart["api_temps"] | tojson }} },
+        { name: "历史ML预测均温", values: {{ ml_weather_chart["ml_temps"] | tojson }} }
+    ],
+    title: "API预报与历史ML预测温度"
+});
+window.renderLineChart("ml-weather-chart", {
+    labels: {{ ml_weather_chart["dates"] | tojson }},
+    series: [
+        { name: "API天气评分", values: {{ ml_weather_chart["api_scores"] | tojson }} },
+        { name: "历史ML预测天气评分", values: {{ ml_weather_chart["ml_scores"] | tojson }} }
+    ],
+    title: "API预报评分与历史ML预测评分"
+});
 window.renderLineChart("history-chart", {
     labels: {{ history_chart["months"] | tojson }},
-    series: [{ name: "历史适宜度", values: {{ history_chart["history_scores"] | tojson }} }],
-    title: "历史月度适宜度"
+    series: [
+        { name: "月度原始适宜度", values: {{ history_chart["history_scores"] | tojson }} },
+        { name: "3个月滑动平均", values: {{ history_chart["history_smoothed_scores"] | tojson }} }
+    ],
+    title: "近12个月历史适宜度趋势"
 });
 </script>
 {% endif %}
