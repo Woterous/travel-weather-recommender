@@ -849,8 +849,8 @@ input[type="text"]:focus {
 }
 
 .filter-form[data-auto-submit-form].is-submitting {
-    opacity: 0.82;
     pointer-events: none;
+    cursor: progress;
 }
 
 .floating-date-switcher {

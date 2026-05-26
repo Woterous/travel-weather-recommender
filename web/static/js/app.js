@@ -4,7 +4,8 @@ const TW_APP = window.TW_APP || (window.TW_APP = {
     routeController: null,
     scrollCleanup: null,
     scrollPositions: {},
-    currentUrl: window.location.href
+    currentUrl: window.location.href,
+    skipRevealOnce: false
 });
 
 function baseChartOption(title) {
@@ -797,14 +798,16 @@ function initScrollExperience() {
         TW_APP.scrollCleanup = null;
     }
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const skipReveal = TW_APP.skipRevealOnce;
+    TW_APP.skipRevealOnce = false;
     const sections = document.querySelectorAll(".main-content > section, .main-content > div");
     sections.forEach((section) => {
         section.classList.add("reveal");
     });
 
-    if (reduceMotion || typeof IntersectionObserver === "undefined") {
+    if (skipReveal || reduceMotion || typeof IntersectionObserver === "undefined") {
         sections.forEach((section) => section.classList.add("is-visible"));
-        return;
+        if (reduceMotion || typeof IntersectionObserver === "undefined") return;
     }
 
     const observer = new IntersectionObserver((entries) => {
@@ -819,10 +822,12 @@ function initScrollExperience() {
         rootMargin: "0px 0px -8% 0px"
     });
 
-    sections.forEach((section, index) => {
-        section.style.transitionDelay = `${Math.min(index * 45, 180)}ms`;
-        observer.observe(section);
-    });
+    if (!skipReveal) {
+        sections.forEach((section, index) => {
+            section.style.transitionDelay = `${Math.min(index * 45, 180)}ms`;
+            observer.observe(section);
+        });
+    }
 
     const heroVisual = document.querySelector("[data-parallax-visual]");
     if (!heroVisual) {
@@ -920,11 +925,14 @@ async function navigateWithinApp(url, options = {}) {
 
     const main = document.querySelector(".main-content");
     const previousScrollY = window.scrollY;
+    const smoothUpdate =
+        Boolean(options.smoothUpdate || options.preserveScroll || options.restoreScroll) ||
+        `${target.pathname}${target.search}` === renderedRouteBase();
     if (TW_APP.currentUrl) {
         TW_APP.scrollPositions[TW_APP.currentUrl] = previousScrollY;
     }
     document.documentElement.classList.add("is-route-loading");
-    if (main) main.classList.add("is-route-loading");
+    if (main && !smoothUpdate) main.classList.add("is-route-loading");
 
     try {
         rememberDetailSource(target.toString());
@@ -961,9 +969,11 @@ async function navigateWithinApp(url, options = {}) {
         currentMain.dataset.routePath = nextMain.dataset.routePath || target.pathname;
         currentMain.dataset.routeSearch = nextMain.dataset.routeSearch || target.search.replace(/^\?/, "");
         currentMain.innerHTML = nextMain.innerHTML;
-        currentMain.classList.remove("page-transition");
-        void currentMain.offsetWidth;
-        currentMain.classList.add("page-transition");
+        if (!smoothUpdate) {
+            currentMain.classList.remove("page-transition");
+            void currentMain.offsetWidth;
+            currentMain.classList.add("page-transition");
+        }
 
         if (options.replaceHistory) {
             history.replaceState({}, "", target.toString());
@@ -971,6 +981,7 @@ async function navigateWithinApp(url, options = {}) {
             history.pushState({}, "", target.toString());
         }
         TW_APP.currentUrl = target.toString();
+        TW_APP.skipRevealOnce = smoothUpdate;
         initPage();
         executeInlinePageScripts(nextDocument);
 
