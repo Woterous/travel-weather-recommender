@@ -89,6 +89,7 @@
                             <input type="hidden" name="longitude" value="{{ result.longitude }}">
                             <input type="hidden" name="province" value="{{ result.province }}">
                             <input type="hidden" name="country" value="{{ result.country }}">
+                            <input type="hidden" name="return_to" value="{{ request.full_path }}#search">
                             {% for key, value in preferences.items() %}
                                 <input type="hidden" name="{{ key }}" value="{{ value }}">
                             {% endfor %}
@@ -135,6 +136,7 @@
                     <input type="hidden" name="longitude" value="{{ selected_search_city.longitude }}">
                     <input type="hidden" name="province" value="{{ selected_search_city.province }}">
                     <input type="hidden" name="country" value="{{ selected_search_city.country }}">
+                    <input type="hidden" name="return_to" value="{{ request.full_path }}#search">
                     {% for key, value in preferences.items() %}
                         <input type="hidden" name="{{ key }}" value="{{ value }}">
                     {% endfor %}

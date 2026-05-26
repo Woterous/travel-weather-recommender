@@ -28,6 +28,10 @@ html {
     scroll-behavior: smooth;
 }
 
+html.is-route-loading {
+    cursor: progress;
+}
+
 body {
     margin: 0;
     color: var(--ink);
@@ -155,6 +159,13 @@ select {
     display: grid;
     gap: 78px;
     margin-top: 38px;
+    transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+}
+
+.main-content.is-route-loading {
+    opacity: 0.46;
+    pointer-events: none;
+    transform: translateY(6px);
 }
 
 .page-transition {
@@ -838,8 +849,114 @@ input[type="text"]:focus {
 }
 
 .filter-form[data-auto-submit-form].is-submitting {
-    opacity: 0.82;
     pointer-events: none;
+    cursor: progress;
+}
+
+.floating-date-switcher {
+    position: fixed;
+    top: 50%;
+    right: 22px;
+    z-index: 23;
+    display: block;
+    transform: translateY(-50%);
+}
+
+.floating-date-switcher.select-open {
+    position: fixed;
+    z-index: 26;
+}
+
+.floating-date-handle {
+    width: 64px;
+    min-height: 92px;
+    display: grid;
+    justify-items: center;
+    align-content: center;
+    gap: 8px;
+    padding: 12px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.76);
+    border-radius: 999px;
+    color: #fff;
+    background: linear-gradient(160deg, #111317 0%, #283142 100%);
+    box-shadow: 0 18px 50px rgba(18, 27, 38, 0.22);
+    cursor: pointer;
+    transition: transform 180ms var(--ease), box-shadow 180ms var(--ease), background 180ms var(--ease);
+}
+
+.floating-date-handle:hover,
+.floating-date-handle:focus {
+    transform: translateX(-2px);
+    background: #05070a;
+    box-shadow: 0 22px 60px rgba(18, 27, 38, 0.28);
+    outline: none;
+}
+
+.floating-date-handle svg {
+    width: 22px;
+    height: 22px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+.floating-date-handle span {
+    writing-mode: vertical-rl;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+}
+
+.floating-date-panel {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + 12px);
+    width: 252px;
+    display: grid;
+    gap: 10px;
+    padding: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 20px 58px rgba(18, 27, 38, 0.16);
+    backdrop-filter: blur(20px) saturate(1.3);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(10px, -50%) scale(0.98);
+    transition: opacity 180ms var(--ease), transform 180ms var(--ease);
+}
+
+.floating-date-switcher:hover .floating-date-panel,
+.floating-date-switcher:focus-within .floating-date-panel,
+.floating-date-switcher.open .floating-date-panel {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translate(0, -50%) scale(1);
+}
+
+.floating-date-kicker {
+    color: var(--brand-strong);
+    font-size: 0.75rem;
+    font-weight: 850;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.floating-date-panel strong {
+    font-size: 1rem;
+}
+
+.floating-date-panel .custom-select-button {
+    min-height: 48px;
+    padding: 10px 14px;
+    border-radius: 16px;
+}
+
+.floating-date-panel .custom-select-menu {
+    max-height: 280px;
+    overflow: auto;
 }
 
 .home-date-card {
@@ -1992,6 +2109,66 @@ input[type="text"]:focus {
         left: auto;
         width: auto;
         margin: 16px;
+    }
+
+    .floating-date-switcher,
+    .floating-date-switcher.select-open {
+        top: auto;
+        right: 88px;
+        bottom: 16px;
+        left: 16px;
+        z-index: 23;
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
+        padding: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.78);
+        border-radius: 26px;
+        background: rgba(255, 255, 255, 0.9);
+        box-shadow: 0 16px 44px rgba(18, 27, 38, 0.16);
+        backdrop-filter: blur(18px) saturate(1.25);
+        transform: none;
+    }
+
+    .floating-date-handle {
+        width: 48px;
+        min-height: 48px;
+        padding: 0;
+    }
+
+    .floating-date-handle span {
+        display: none;
+    }
+
+    .floating-date-panel {
+        position: static;
+        width: auto;
+        min-width: 0;
+        padding: 0;
+        border: 0;
+        background: transparent;
+        box-shadow: none;
+        opacity: 1;
+        pointer-events: auto;
+        transform: none;
+        backdrop-filter: none;
+    }
+
+    .floating-date-switcher:hover .floating-date-panel,
+    .floating-date-switcher:focus-within .floating-date-panel,
+    .floating-date-switcher.open .floating-date-panel {
+        transform: none;
+    }
+
+    .floating-date-kicker,
+    .floating-date-panel strong {
+        display: none;
+    }
+
+    .floating-date-panel .custom-select-button {
+        min-height: 48px;
+        border-radius: 18px;
     }
 
     .search-input-row,
