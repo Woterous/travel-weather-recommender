@@ -57,6 +57,18 @@ def _preferred_forecast_date(available_dates: list[str]) -> str:
     return available_dates[-1] if available_dates else ""
 
 
+def _resolve_history_month(requested_month: str | None, month_options: list[int]) -> int:
+    fallback_month = month_options[0] if month_options else 1
+    if requested_month:
+        try:
+            requested_value = int(requested_month)
+        except ValueError:
+            requested_value = fallback_month
+        return requested_value if requested_value in month_options else fallback_month
+    current_month = date.today().month
+    return current_month if current_month in month_options else fallback_month
+
+
 def _preferred_repository_forecast_date(repository: WeatherRepository) -> str:
     return _preferred_forecast_date(repository.get_forecast_dates())
 
@@ -287,7 +299,7 @@ def register_routes(app: Flask) -> None:
         history_df = repository.get_history_monthly()
         city_series = get_city_history_series(history_df, city_slug)
         month_options = month_num_options(history_df)
-        selected_month = int(request.args.get("month", month_options[0] if month_options else 1))
+        selected_month = _resolve_history_month(request.args.get("month"), month_options)
         ranking = get_history_ranking(history_df, selected_month, metric)
         chart_data = {
             "months": [item["month_key"] for item in city_series],

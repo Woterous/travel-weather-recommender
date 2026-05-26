@@ -25,6 +25,7 @@ from service import pipeline
 from service.ranking import _build_homepage_context_cached, build_homepage_context
 from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
+from web.routes import _resolve_history_month
 
 
 class AppSmokeTest(unittest.TestCase):
@@ -40,6 +41,10 @@ class AppSmokeTest(unittest.TestCase):
         response = self.client.post("/api/assistant", json={"message": "今天推荐哪个城市"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("answer", response.get_json())
+
+    def test_history_month_defaults_to_current_month(self) -> None:
+        self.assertEqual(_resolve_history_month(None, list(range(1, 13))), date.today().month)
+        self.assertEqual(_resolve_history_month("8", list(range(1, 13))), 8)
 
 
 class AqiIntegrationTest(unittest.TestCase):
