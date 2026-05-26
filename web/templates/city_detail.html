@@ -118,10 +118,31 @@
     </div>
 </section>
 {% else %}
+{% if autoload_city %}
+<section class="empty-state card" data-city-autoload data-refresh-url="{{ url_for('refresh_city_start') }}">
+    <h2>正在加载 {{ city.name }} 的天气数据</h2>
+    <p data-city-load-message>已进入城市详情页，正在后台抓取未来天气和历史样本。</p>
+    <div class="progress-bar"><span data-city-load-bar></span></div>
+    <p class="muted" data-city-load-percent>0%</p>
+    <form data-city-load-form>
+        <input type="hidden" name="slug" value="{{ city.slug }}">
+        <input type="hidden" name="name" value="{{ city.name }}">
+        <input type="hidden" name="latitude" value="{{ city.latitude }}">
+        <input type="hidden" name="longitude" value="{{ city.longitude }}">
+        <input type="hidden" name="province" value="{{ request.args.get('province', '') }}">
+        <input type="hidden" name="country" value="{{ request.args.get('country', '') }}">
+        {% for key, value in preferences.items() %}
+            <input type="hidden" name="{{ key }}" value="{{ value }}">
+        {% endfor %}
+        <input type="hidden" name="date" value="{{ selected_date }}">
+    </form>
+</section>
+{% else %}
 <section class="empty-state card">
     <h2>当前日期没有可展示的城市详情</h2>
     <p>先刷新数据，或者切换到存在数据的日期。</p>
 </section>
+{% endif %}
 {% endif %}
 {% endblock %}
 

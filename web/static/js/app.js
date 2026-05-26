@@ -193,17 +193,15 @@ function initCitySuggestions() {
     }
 
     function selectCity(city) {
-        const target = new URL(form.action || window.location.pathname, window.location.origin);
+        const target = new URL(`/city/${encodeURIComponent(city.slug || "")}`, window.location.origin);
         const params = new URLSearchParams(window.location.search);
         clearCandidates(params);
-        params.set("q", input.value.trim() || city.name || "");
-        params.set("candidate_slug", city.slug || "");
-        params.set("candidate_name", city.name || "");
-        params.set("candidate_latitude", city.latitude || "");
-        params.set("candidate_longitude", city.longitude || "");
-        params.set("candidate_province", city.province || "");
-        params.set("candidate_country", city.country || "");
-        params.set("candidate_display_name", city.display_name || city.name || "");
+        params.set("autoload", "1");
+        params.set("name", city.name || "");
+        params.set("latitude", city.latitude || "");
+        params.set("longitude", city.longitude || "");
+        params.set("province", city.province || "");
+        params.set("country", city.country || "");
         target.search = params.toString();
         window.location.href = target.toString();
     }
@@ -392,3 +390,54 @@ function initRefreshProgress() {
 }
 
 document.addEventListener("DOMContentLoaded", initRefreshProgress);
+
+function initCityAutoload() {
+    const panel = document.querySelector("[data-city-autoload]");
+    if (!panel) return;
+    const form = panel.querySelector("[data-city-load-form]");
+    const messageNode = panel.querySelector("[data-city-load-message]");
+    const barNode = panel.querySelector("[data-city-load-bar]");
+    const percentNode = panel.querySelector("[data-city-load-percent]");
+    const refreshUrl = panel.dataset.refreshUrl;
+    if (!form || !refreshUrl || typeof EventSource === "undefined") return;
+
+    function applyProgress(event) {
+        const step = Number(event.step || 1);
+        const total = Number(event.total || 4);
+        const percent = Math.max(12, Math.min(100, Math.round((step / total) * 100)));
+        if (barNode) barNode.style.width = `${percent}%`;
+        if (percentNode) percentNode.textContent = `${percent}%`;
+        if (messageNode) messageNode.textContent = event.message || "";
+        if (event.redirect_url && ["done", "warning"].includes(event.status)) {
+            window.setTimeout(() => {
+                window.location.href = event.redirect_url;
+            }, 700);
+        }
+    }
+
+    fetch(refreshUrl, {
+        method: "POST",
+        body: new FormData(form),
+        headers: { "X-Requested-With": "XMLHttpRequest" }
+    })
+        .then((response) => response.json())
+        .then((payload) => {
+            const eventSource = new EventSource(`/refresh/events/${payload.job_id}`);
+            eventSource.onmessage = (messageEvent) => {
+                const event = JSON.parse(messageEvent.data);
+                applyProgress(event);
+                if (["done", "warning", "error"].includes(event.status)) {
+                    eventSource.close();
+                }
+            };
+            eventSource.onerror = () => {
+                if (messageNode) messageNode.textContent = "加载连接中断，请稍后刷新页面查看结果。";
+                eventSource.close();
+            };
+        })
+        .catch(() => {
+            if (messageNode) messageNode.textContent = "无法启动城市数据加载，请返回首页重试。";
+        });
+}
+
+document.addEventListener("DOMContentLoaded", initCityAutoload);
