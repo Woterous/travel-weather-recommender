@@ -241,7 +241,7 @@
             <span>展示本地缓存与搜索刷新结果</span>
         </div>
         <ol class="ranking-list">
-            {% for row in ranking %}
+            {% for row in ranking[:10] %}
             <li class="ranking-row">
                 <div>
                     <strong>#{{ row.rank }} {{ row.city_name }}</strong>
@@ -257,13 +257,23 @@
     </div>
 </section>
 
+{% endif %}
+{% if city_catalog %}
+<section class="section-head">
+    <div>
+        <h2>当前城市库</h2>
+        <p class="muted">包含默认 10 个城市和已添加城市；有当前日期天气数据的城市会显示评分。</p>
+    </div>
+    <span>{{ city_catalog|length }} 个城市</span>
+</section>
 <section class="city-grid">
-    {% for row in ranking %}
+    {% for row in city_catalog %}
     <article class="city-card">
         <div class="city-card-head">
-            <h3>{{ row.city_name }}</h3>
-            <span>#{{ row.rank }}</span>
+            <h3>{{ row.city_name if row.has_score else row.name }}</h3>
+            <span>{{ "#" ~ row.rank if row.has_score else row.source_label }}</span>
         </div>
+        {% if row.has_score %}
         <p class="weather-line">{{ row.weather_detail }} · 均温 {{ "%.1f"|format(row.avg_temp) }}℃</p>
         <p class="muted">
             风力 {{ row.wind_level if row.wind_level is not none else "-" }} 级 ·
@@ -278,6 +288,16 @@
                 <a class="button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b='beijing' if row.city_slug != 'beijing' else 'shanghai') }}">加入对比</a>
             </div>
         </div>
+        {% else %}
+        <p class="weather-line">暂无 {{ selected_date }} 的天气评分</p>
+        <p class="muted">这个城市已经在城市库中，但还没有当前日期的预报数据。点击详情或重新添加刷新后会生成可排行数据。</p>
+        <div class="city-card-foot">
+            <strong class="score-big">-</strong>
+            <div class="card-actions">
+                <a class="button button-ghost" href="{{ url_for('city_detail', city_slug=row.slug) }}?{{ query_with(preferences, date=selected_date) }}">查看详情</a>
+            </div>
+        </div>
+        {% endif %}
     </article>
     {% endfor %}
 </section>

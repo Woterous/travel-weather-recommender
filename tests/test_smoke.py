@@ -12,6 +12,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from app import app
 from config.cities import CityConfig
+from config.preferences import DEFAULT_PREFERENCES
 from service.city_search import city_from_search_payload
 from service.city_search import search_cities
 from service.clean_data import build_forecast_dataset, build_history_daily_dataset
@@ -19,6 +20,7 @@ from service.database import _sanitize_refresh_message
 from service import database
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
 from service import pipeline
+from service.ranking import _build_homepage_context_cached, build_homepage_context
 from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
 
@@ -111,6 +113,7 @@ class SearchAndModelTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             database.DB_PATH = Path(temp_dir) / "test.sqlite3"
             try:
+                _build_homepage_context_cached.cache_clear()
                 repo = database.WeatherRepository()
                 city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
 
@@ -120,6 +123,24 @@ class SearchAndModelTest(unittest.TestCase):
                 self.assertEqual(added[0]["slug"], "geo-1809858")
                 self.assertEqual(added[0]["name"], "广州")
             finally:
+                database.DB_PATH = original_db_path
+
+    def test_homepage_city_catalog_includes_default_and_added_cities(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-1809858", "广州", "guangzhou", 23.11667, 113.25)
+
+                repo.add_city_record(city, province="广东", country="中国")
+                context = build_homepage_context(repo, "2026-05-24", DEFAULT_PREFERENCES)
+                names = [item["name"] for item in context["city_catalog"]]
+
+                self.assertIn("北京", names)
+                self.assertIn("广州", names)
+            finally:
+                _build_homepage_context_cached.cache_clear()
                 database.DB_PATH = original_db_path
 
     def test_city_search_suggests_curated_matches_for_single_character(self) -> None:
