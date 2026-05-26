@@ -392,6 +392,26 @@ class SearchAndModelTest(unittest.TestCase):
             finally:
                 database.DB_PATH = original_db_path
 
+    def test_home_search_history_items_can_be_deleted(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                repo = database.WeatherRepository()
+                city = CityConfig("geo-test-history", "测试城", "ceshicheng", 31.2, 121.5)
+                repo.add_city_record(city, province="测试省", country="中国")
+
+                response = app.test_client().get("/")
+
+                self.assertEqual(response.status_code, 200)
+                text = response.data.decode("utf-8")
+                self.assertIn("搜索历史", text)
+                self.assertIn("/city/delete", text)
+                self.assertIn('aria-label="删除 ', text)
+                self.assertIn('class="history-city-delete"', text)
+            finally:
+                database.DB_PATH = original_db_path
+
     def test_delete_city_route_removes_custom_city(self) -> None:
         original_db_path = database.DB_PATH
         with tempfile.TemporaryDirectory() as temp_dir:

@@ -150,7 +150,18 @@
         <div class="added-city-row">
             <span class="muted">搜索历史</span>
             {% for item in added_cities[:8] %}
-                <a href="{{ url_for('city_detail', city_slug=item.slug) }}?{{ query_with(preferences, date=selected_date) }}">{{ item.name }}</a>
+                <div class="history-city-chip">
+                    <a href="{{ url_for('city_detail', city_slug=item.slug) }}?{{ query_with(preferences, date=selected_date) }}">{{ item.name }}</a>
+                    <form method="post" action="{{ url_for('delete_city') }}" onsubmit="return confirm('确定删除 {{ item.name }} 吗？');">
+                        <input type="hidden" name="slug" value="{{ item.slug }}">
+                        <input type="hidden" name="name" value="{{ item.name }}">
+                        {% for key, value in preferences.items() %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endfor %}
+                        <input type="hidden" name="date" value="{{ selected_date }}">
+                        <button type="submit" class="history-city-delete" aria-label="删除 {{ item.name }}" title="删除">&times;</button>
+                    </form>
+                </div>
             {% endfor %}
         </div>
         {% endif %}
