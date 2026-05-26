@@ -28,9 +28,9 @@
             <a class="button button-ghost" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=city.slug, city_b='beijing' if city.slug != 'beijing' else 'shanghai') }}">加入对比</a>
         </div>
     </div>
-    <form method="get" action="{{ url_for('city_detail', city_slug=city.slug) }}" class="hero-meta filter-form">
+    <form method="get" action="{{ url_for('city_detail', city_slug=city.slug) }}" class="hero-meta filter-form" data-auto-submit-form>
         <h3>切换日期</h3>
-        <select name="date">
+        <select name="date" aria-label="切换日期">
             {% for date_item in available_dates %}
                 <option value="{{ date_item }}" {% if date_item == selected_date %}selected{% endif %}>{{ date_item }}</option>
             {% endfor %}
@@ -38,7 +38,6 @@
         {% for key, value in preferences.items() %}
             <input type="hidden" name="{{ key }}" value="{{ value }}">
         {% endfor %}
-        <button type="submit" class="button">查看</button>
     </form>
 </section>
 
@@ -160,13 +159,20 @@
         </div>
     </div>
 
-    <div class="card">
-        <div class="section-head"><h2>历史月度统计</h2><span>本地持久化</span></div>
-        <div class="status-strip">
+    <div class="card history-month-card">
+        <div class="section-head"><h2>历史月度统计</h2></div>
+        <div class="history-month-grid">
             {% for item in history_series[-6:] %}
-            <div class="metric-tile">
-                <span>{{ item.month_key }}</span>
-                <strong>舒适天占比 {{ "%.0f"|format(item.comfortable_days_ratio * 100) }}%</strong>
+            {% set comfort_percent = item.comfortable_days_ratio * 100 %}
+            <div class="history-month-item">
+                <div class="history-month-item-head">
+                    <span>{{ item.month_key }}</span>
+                    <strong>{{ "%.0f"|format(comfort_percent) }}%</strong>
+                </div>
+                <div class="history-month-bar" aria-hidden="true">
+                    <span style="width: {{ "%.0f"|format(comfort_percent) }}%;"></span>
+                </div>
+                <small>舒适天占比</small>
             </div>
             {% endfor %}
         </div>
