@@ -3,50 +3,71 @@
 {% block title %}偏好设置 | 旅行天气推荐系统{% endblock %}
 
 {% block content %}
-<section class="hero-panel compact">
+<section class="hero-panel compact preference-hero">
     <div class="hero-copy">
         <p class="eyebrow">偏好设置页</p>
-        <h1>让偏好真正影响推荐结果</h1>
-        <p>提交后会重新计算首页排行榜、城市详情和对比结果。</p>
-    </div>
-    <div class="hero-meta card">
-        <h3>当前数据状态</h3>
-        <p><strong>最近刷新时间：</strong>{{ latest_refresh.refresh_time }}</p>
-        <p><strong>AQI 模式：</strong>{{ "已启用" if aqi_available else "无 AQI 模式" }}</p>
+        <h1>偏好设置</h1>
     </div>
 </section>
 
-<section class="two-column">
-    <form method="post" action="{{ url_for('preferences_page') }}" class="card preference-form">
+<section class="two-column preference-layout">
+    <form method="get" action="{{ url_for('preferences_page') }}" class="card preference-form preference-slider-form" data-preference-form>
         <input type="hidden" name="date" value="{{ selected_date }}">
         <div class="section-head">
-            <h2>偏好表单</h2>
-            <span>提交后跳回首页</span>
+            <h2>偏好滑块</h2>
         </div>
         {% for key, options in preference_options.items() %}
             {% if key != "aqi_sensitivity" or aqi_available %}
-            <label>{{ key }}</label>
-            <select name="{{ key }}">
-                {% for value, label in options %}
-                    <option value="{{ value }}" {% if preferences[key] == value %}selected{% endif %}>{{ label }}</option>
-                {% endfor %}
-            </select>
+            {% set slider = namespace(index=0) %}
+            {% for value, label in options %}
+                {% if preferences[key] == value %}
+                    {% set slider.index = loop.index0 %}
+                {% endif %}
+            {% endfor %}
+            <div class="preference-slider-row" data-preference-row>
+                <div class="preference-slider-head">
+                    <label for="preference-{{ key }}">
+                        {% if key == "rain_sensitivity" %}降雨敏感度{% endif %}
+                        {% if key == "temperature_preference" %}温度偏好{% endif %}
+                        {% if key == "wind_sensitivity" %}风力敏感度{% endif %}
+                        {% if key == "travel_style" %}旅行风格{% endif %}
+                        {% if key == "aqi_sensitivity" %}空气质量敏感度{% endif %}
+                    </label>
+                    <strong data-preference-current>{{ preference_label(key, preferences[key]) }}</strong>
+                </div>
+                <input type="hidden" name="{{ key }}" value="{{ preferences[key] }}" data-preference-value data-default-value="{{ default_preferences[key] }}">
+                <input
+                    id="preference-{{ key }}"
+                    type="range"
+                    min="0"
+                    max="{{ options|length - 1 }}"
+                    step="1"
+                    value="{{ slider.index }}"
+                    aria-label="{{ key }}"
+                    data-preference-slider
+                    data-options='{{ options | tojson }}'
+                >
+                <div class="preference-ticks" aria-hidden="true">
+                    {% for value, label in options %}
+                    <span class="{% if value == preferences[key] %}active{% endif %}" data-preference-tick>{{ label }}</span>
+                    {% endfor %}
+                </div>
+            </div>
             {% endif %}
         {% endfor %}
-        <div class="form-actions">
-            <button type="submit" class="button button-primary">应用偏好</button>
-            <button type="submit" class="button button-ghost" name="action" value="reset">恢复默认</button>
+        <div class="form-actions preference-actions">
+            <button type="button" class="button button-ghost" data-preference-reset>恢复默认</button>
         </div>
     </form>
 
-    <div class="card">
+    <div class="card preference-impact-card">
         <div class="section-head">
             <h2>影响说明</h2>
             <span>当前规则摘要</span>
         </div>
-        <ul class="weight-list">
+        <div class="impact-weight-grid">
             {% for key, value in weights_preview.items() %}
-                <li>
+                <div class="impact-weight-item">
                     <span>
                         {% if key == "temperature" %}温度舒适度{% endif %}
                         {% if key == "rain" %}降雨风险{% endif %}
@@ -56,10 +77,10 @@
                         {% if key == "aqi" %}AQI{% endif %}
                     </span>
                     <strong>{{ "%.2f"|format(value) }}</strong>
-                </li>
+                </div>
             {% endfor %}
-        </ul>
-        <ul class="note-list">
+        </div>
+        <ul class="impact-note-list">
             <li>怕下雨会提高降雨项惩罚。</li>
             <li>温度偏好会改变舒适区间的判定。</li>
             <li>风力敏感度会放大或缩小大风带来的扣分。</li>

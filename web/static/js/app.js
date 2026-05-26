@@ -447,6 +447,90 @@ function initCityAutoload() {
 
 document.addEventListener("DOMContentLoaded", initCityAutoload);
 
+function initPreferenceSliders() {
+    const form = document.querySelector("[data-preference-form]");
+    if (!form) return;
+
+    const status = form.querySelector("[data-preference-save-status]");
+    const sliders = form.querySelectorAll("[data-preference-slider]");
+    const resetButton = form.querySelector("[data-preference-reset]");
+    let saveTimer = null;
+    let lastQuery = new URLSearchParams(new FormData(form)).toString();
+
+    function optionList(slider) {
+        try {
+            return JSON.parse(slider.dataset.options || "[]");
+        } catch (error) {
+            return [];
+        }
+    }
+
+    function setStatus(text, state) {
+        if (!status) return;
+        status.textContent = text;
+        status.classList.toggle("saving", state === "saving");
+    }
+
+    function applySliderValue(slider) {
+        const row = slider.closest("[data-preference-row]");
+        const hidden = row ? row.querySelector("[data-preference-value]") : null;
+        const current = row ? row.querySelector("[data-preference-current]") : null;
+        const ticks = row ? row.querySelectorAll("[data-preference-tick]") : [];
+        const options = optionList(slider);
+        const index = Math.max(0, Math.min(options.length - 1, Number(slider.value) || 0));
+        const option = options[index];
+        if (!option) return;
+        if (hidden) hidden.value = option[0];
+        if (current) current.textContent = option[1];
+        ticks.forEach((tick, tickIndex) => {
+            tick.classList.toggle("active", tickIndex === index);
+        });
+    }
+
+    function submitPreferences(delay) {
+        window.clearTimeout(saveTimer);
+        setStatus("正在保存...", "saving");
+        saveTimer = window.setTimeout(() => {
+            const query = new URLSearchParams(new FormData(form)).toString();
+            if (query === lastQuery) {
+                setStatus("已保存", "saved");
+                return;
+            }
+            lastQuery = query;
+            window.location.href = `${form.action}?${query}`;
+        }, delay);
+    }
+
+    sliders.forEach((slider) => {
+        slider.addEventListener("input", () => {
+            applySliderValue(slider);
+            submitPreferences(700);
+        });
+        slider.addEventListener("change", () => {
+            applySliderValue(slider);
+            submitPreferences(220);
+        });
+        applySliderValue(slider);
+    });
+
+    if (resetButton) {
+        resetButton.addEventListener("click", () => {
+            sliders.forEach((slider) => {
+                const row = slider.closest("[data-preference-row]");
+                const hidden = row ? row.querySelector("[data-preference-value]") : null;
+                const defaultValue = hidden ? hidden.dataset.defaultValue : "";
+                const options = optionList(slider);
+                const defaultIndex = Math.max(0, options.findIndex((option) => option[0] === defaultValue));
+                slider.value = String(defaultIndex);
+                applySliderValue(slider);
+            });
+            submitPreferences(120);
+        });
+    }
+}
+
+document.addEventListener("DOMContentLoaded", initPreferenceSliders);
+
 function initScrollExperience() {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const sections = document.querySelectorAll(".main-content > section, .main-content > div");

@@ -209,6 +209,7 @@ def register_routes(app: Flask) -> None:
         return render_template(
             "preference.html",
             preferences=preferences,
+            default_preferences=DEFAULT_PREFERENCES,
             selected_date=request.args.get("date") or "",
             latest_refresh=repository.get_latest_refresh_info(),
             aqi_available=repository.aqi_available(),
