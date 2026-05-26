@@ -1,15 +1,19 @@
 {% extends "base.html" %}
 
-{% block title %}{{ city.name }} 详情 | 旅行天气推荐系统{% endblock %}
+{% block title %}{{ city.name }} 详情 | Travel Weather{% endblock %}
 
 {% block content %}
 <section class="hero-panel compact">
     <div class="hero-copy">
-        <p class="eyebrow">城市详情页</p>
+        <p class="eyebrow">City Detail</p>
         <h1>{{ city.name }}</h1>
-        <p>展示指定日期的评分结果，以及未来趋势和历史月度统计。</p>
+        <p>查看指定日期的推荐结论、基础天气、机器学习预测、未来趋势和历史月度表现。</p>
+        <div class="hero-actions">
+            <button type="button" class="button button-primary" onclick="history.back()">返回上一页</button>
+            <a class="button button-ghost" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=city.slug, city_b='beijing' if city.slug != 'beijing' else 'shanghai') }}">加入对比</a>
+        </div>
     </div>
-    <form method="get" action="{{ url_for('city_detail', city_slug=city.slug) }}" class="card filter-form">
+    <form method="get" action="{{ url_for('city_detail', city_slug=city.slug) }}" class="hero-meta filter-form">
         <h3>切换日期</h3>
         <select name="date">
             {% for date_item in available_dates %}
@@ -24,35 +28,76 @@
 </section>
 
 {% if selected %}
-<section class="content-grid">
-    <div class="card">
-        <div class="section-head"><h2>基础天气信息</h2><span>{{ selected.date }}</span></div>
-        <ul class="meta-list">
-            <li><span>天气</span><strong>{{ selected.weather_detail }}</strong></li>
-            <li><span>最高温</span><strong>{{ selected.max_temp }}℃</strong></li>
-            <li><span>最低温</span><strong>{{ selected.min_temp }}℃</strong></li>
-            <li><span>平均温</span><strong>{{ selected.avg_temp }}℃</strong></li>
-            <li><span>风力等级</span><strong>{{ selected.wind_level if selected.wind_level is not none else "-" }}</strong></li>
-            <li><span>降雨</span><strong>{{ "有" if selected.rain_flag else "低风险" }}</strong></li>
-            {% if aqi_available %}
-            <li><span>AQI</span><strong>{{ aqi_display(selected.aqi) }}</strong></li>
-            {% endif %}
-        </ul>
+<section class="product-section">
+    <div class="section-intro split">
+        <div>
+            <p class="section-kicker">Recommendation Result</p>
+            <h2 class="section-title">这一天，{{ city.name }} 的出行状态。</h2>
+        </div>
+        <p class="section-lead">{{ selected.reason }}</p>
     </div>
-    <div class="card">
-        <div class="section-head"><h2>推荐结论</h2><span>总分 {{ selected.score_total }}</span></div>
-        <p>{{ selected.reason }}</p>
-        <ul class="tag-list">
-            <li>API规则分 {{ selected.rule_score }}</li>
-            <li>历史ML预测评分 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
-            <li>模型置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
-            <li>最近刷新 {{ latest_refresh.refresh_time }}</li>
-        </ul>
+
+    <div class="recommendation-grid">
+        <div class="feature-city hover-lift">
+            <span class="rank-badge">{{ selected.date }}</span>
+            <h2>{{ city.name }}</h2>
+            <p>{{ selected.weather_detail }} · 平均温 {{ selected.avg_temp }}℃ · {{ "有雨" if selected.rain_flag else "低降雨风险" }}</p>
+            <strong class="score-big">{{ selected.score_total }}</strong>
+        </div>
+        <div class="card">
+            <div class="section-head"><h2>推荐结论</h2><span>总分 {{ selected.score_total }}</span></div>
+            <p>{{ selected.reason }}</p>
+            <ul class="tag-list">
+                <li>API规则分 {{ selected.rule_score }}</li>
+                <li>历史ML预测评分 {{ selected.ml_score if selected.ml_score is not none else "-" }}</li>
+                <li>模型置信度 {{ "%.0f%%"|format(selected.ml_confidence * 100) }}</li>
+                <li>最近刷新 {{ latest_refresh.refresh_time }}</li>
+            </ul>
+        </div>
+    </div>
+</section>
+
+<section class="product-section">
+    <div class="section-intro split">
+        <div>
+            <p class="section-kicker">Weather Snapshot</p>
+            <h2 class="section-title">天气要素被压缩成可读的判断。</h2>
+        </div>
+        <p class="section-lead">保留最高温、最低温、风力、降雨和 AQI 等核心指标。</p>
+    </div>
+
+    <div class="content-grid">
+        <div class="card">
+            <div class="section-head"><h2>基础天气信息</h2><span>{{ selected.date }}</span></div>
+            <ul class="meta-list">
+                <li><span>天气</span><strong>{{ selected.weather_detail }}</strong></li>
+                <li><span>最高温</span><strong>{{ selected.max_temp }}℃</strong></li>
+                <li><span>最低温</span><strong>{{ selected.min_temp }}℃</strong></li>
+                <li><span>平均温</span><strong>{{ selected.avg_temp }}℃</strong></li>
+                <li><span>风力等级</span><strong>{{ selected.wind_level if selected.wind_level is not none else "-" }}</strong></li>
+                <li><span>降雨</span><strong>{{ "有" if selected.rain_flag else "低风险" }}</strong></li>
+                {% if aqi_available %}
+                <li><span>AQI</span><strong>{{ aqi_display(selected.aqi) }}</strong></li>
+                {% endif %}
+            </ul>
+        </div>
+        <div class="card chart-card">
+            <div class="section-head"><h2>分项得分</h2><span>单日</span></div>
+            <div id="breakdown-chart" class="chart"></div>
+        </div>
     </div>
 </section>
 
 {% if selected.ml_weather %}
-<section>
+<section class="product-section">
+    <div class="section-intro split">
+        <div>
+            <p class="section-kicker">ML Forecast</p>
+            <h2 class="section-title">历史样本预测出的天气倾向。</h2>
+        </div>
+        <p class="section-lead">机器学习预测与 API 预报分开展示，帮助判断天气稳定性。</p>
+    </div>
+
     <div class="card">
         <div class="section-head"><h2>历史机器学习预测天气</h2><span>{{ selected.date }}</span></div>
         <ul class="meta-list">
@@ -66,43 +111,50 @@
             <li><span>预测天气评分</span><strong>{{ selected.ml_score }}</strong></li>
         </ul>
     </div>
-</section>
 
-<section class="content-grid">
-    <div class="card chart-card">
-        <div class="section-head"><h2>预测温度对比</h2><span>未来 7 天</span></div>
-        <div id="ml-temp-chart" class="chart"></div>
-    </div>
-    <div class="card chart-card">
-        <div class="section-head"><h2>天气评分对比</h2><span>近 7 天</span></div>
-        <div id="ml-weather-chart" class="chart"></div>
+    <div class="content-grid">
+        <div class="card chart-card">
+            <div class="section-head"><h2>预测温度对比</h2><span>未来 7 天</span></div>
+            <div id="ml-temp-chart" class="chart"></div>
+        </div>
+        <div class="card chart-card">
+            <div class="section-head"><h2>天气评分对比</h2><span>近 7 天</span></div>
+            <div id="ml-weather-chart" class="chart"></div>
+        </div>
     </div>
 </section>
 {% endif %}
 
-<section class="content-grid">
-    <div class="card chart-card">
-        <div class="section-head"><h2>分项得分</h2><span>单日</span></div>
-        <div id="breakdown-chart" class="chart"></div>
+<section class="product-section">
+    <div class="section-intro split">
+        <div>
+            <p class="section-kicker">Trend</p>
+            <h2 class="section-title">未来趋势与历史画像放在最后判断。</h2>
+        </div>
+        <p class="section-lead">先看当天是否适合出发，再看接下来一周和近 12 个月是否稳定。</p>
     </div>
-    <div class="card chart-card">
-        <div class="section-head"><h2>未来趋势</h2><span>近 7 天</span></div>
-        <div id="trend-chart" class="chart"></div>
-    </div>
-</section>
 
-<section class="content-grid">
+    <div class="content-grid">
+        <div class="card chart-card">
+            <div class="section-head"><h2>未来趋势</h2><span>近 7 天</span></div>
+            <div id="trend-chart" class="chart"></div>
+        </div>
+        <div class="card chart-card">
+            <div class="section-head"><h2>历史趋势</h2><span>近12个月适宜度与平滑趋势</span></div>
+            <div id="history-chart" class="chart"></div>
+        </div>
+    </div>
+
     <div class="card">
         <div class="section-head"><h2>历史月度统计</h2><span>本地持久化</span></div>
-        <ul class="meta-list">
+        <div class="status-strip">
             {% for item in history_series[-6:] %}
-            <li><span>{{ item.month_key }}</span><strong>舒适天占比 {{ "%.0f"|format(item.comfortable_days_ratio * 100) }}%</strong></li>
+            <div class="metric-tile">
+                <span>{{ item.month_key }}</span>
+                <strong>舒适天占比 {{ "%.0f"|format(item.comfortable_days_ratio * 100) }}%</strong>
+            </div>
             {% endfor %}
-        </ul>
-    </div>
-    <div class="card chart-card">
-        <div class="section-head"><h2>历史趋势</h2><span>近12个月适宜度与平滑趋势</span></div>
-        <div id="history-chart" class="chart"></div>
+        </div>
     </div>
 </section>
 {% else %}

@@ -5,13 +5,18 @@ function baseChartOption(title) {
             text: title || "",
             left: "center",
             textStyle: {
-                fontFamily: "Georgia, serif",
+                fontFamily: "-apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif",
                 fontSize: 16,
-                fontWeight: 600,
-                color: "#192127"
+                fontWeight: 700,
+                color: "#111317"
             }
         },
-        tooltip: { trigger: "axis" },
+        tooltip: {
+            trigger: "axis",
+            backgroundColor: "rgba(17,19,23,0.92)",
+            borderWidth: 0,
+            textStyle: { color: "#fff" }
+        },
         grid: { left: 48, right: 24, top: 58, bottom: 48 }
     };
 }
@@ -28,18 +33,18 @@ window.renderBarChart = function renderBarChart(elementId, payload) {
     const chart = safeInitChart(elementId);
     if (!chart) return;
     const option = baseChartOption(payload.title);
-    option.xAxis = { type: "category", data: payload.labels, axisLabel: { color: "#48545a", rotate: 20 } };
-    option.yAxis = { type: "value", axisLabel: { color: "#48545a" } };
+    option.xAxis = { type: "category", data: payload.labels, axisLabel: { color: "#656d78", rotate: 20 }, axisLine: { lineStyle: { color: "rgba(17,19,23,0.12)" } } };
+    option.yAxis = { type: "value", axisLabel: { color: "#656d78" }, splitLine: { lineStyle: { color: "rgba(17,19,23,0.07)" } } };
     option.series = [{
         type: "bar",
         data: payload.values,
         barWidth: 28,
         itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: "#d98c3f" },
-                { offset: 1, color: "#165a72" }
+                { offset: 0, color: "#0b6cff" },
+                { offset: 1, color: "#19a974" }
             ]),
-            borderRadius: [10, 10, 0, 0]
+            borderRadius: [14, 14, 0, 0]
         }
     }];
     chart.setOption(option);
@@ -51,14 +56,14 @@ window.renderGroupedBarChart = function renderGroupedBarChart(elementId, payload
     if (!chart) return;
     const option = baseChartOption(payload.title);
     option.legend = { top: 30 };
-    option.xAxis = { type: "category", data: payload.labels, axisLabel: { color: "#48545a" } };
-    option.yAxis = { type: "value", axisLabel: { color: "#48545a" } };
+    option.xAxis = { type: "category", data: payload.labels, axisLabel: { color: "#656d78" }, axisLine: { lineStyle: { color: "rgba(17,19,23,0.12)" } } };
+    option.yAxis = { type: "value", axisLabel: { color: "#656d78" }, splitLine: { lineStyle: { color: "rgba(17,19,23,0.07)" } } };
     option.series = payload.series.map((item, index) => ({
         name: item.name,
         type: "bar",
         data: item.values,
         itemStyle: {
-            color: index === 0 ? "#165a72" : "#d98c3f",
+            color: index === 0 ? "#0b6cff" : "#19a974",
             borderRadius: [8, 8, 0, 0]
         }
     }));
@@ -71,8 +76,8 @@ window.renderLineChart = function renderLineChart(elementId, payload) {
     if (!chart) return;
     const option = baseChartOption(payload.title);
     option.legend = { top: 30 };
-    option.xAxis = { type: "category", data: payload.labels, axisLabel: { color: "#48545a" } };
-    option.yAxis = { type: "value", axisLabel: { color: "#48545a" } };
+    option.xAxis = { type: "category", data: payload.labels, axisLabel: { color: "#656d78" }, axisLine: { lineStyle: { color: "rgba(17,19,23,0.12)" } } };
+    option.yAxis = { type: "value", axisLabel: { color: "#656d78" }, splitLine: { lineStyle: { color: "rgba(17,19,23,0.07)" } } };
     option.series = payload.series.map((item, index) => ({
         name: item.name,
         type: "line",
@@ -80,8 +85,8 @@ window.renderLineChart = function renderLineChart(elementId, payload) {
         data: item.values,
         symbolSize: 8,
         lineStyle: { width: 3 },
-        itemStyle: { color: index === 0 ? "#165a72" : index === 1 ? "#d98c3f" : "#5b7f3a" },
-        areaStyle: index === 0 ? { color: "rgba(22,90,114,0.08)" } : undefined
+        itemStyle: { color: index === 0 ? "#0b6cff" : index === 1 ? "#19a974" : "#ff9f1c" },
+        areaStyle: index === 0 ? { color: "rgba(11,108,255,0.08)" } : undefined
     }));
     if (payload.visibleWindow && payload.labels.length > payload.visibleWindow) {
         const startValue = payload.labels.length - payload.visibleWindow;
@@ -93,10 +98,10 @@ window.renderLineChart = function renderLineChart(elementId, payload) {
                 endValue: payload.labels.length - 1,
                 height: 18,
                 bottom: 18,
-                borderColor: "rgba(22,90,114,0.18)",
-                fillerColor: "rgba(22,90,114,0.12)",
-                handleStyle: { color: "#165a72" },
-                textStyle: { color: "#5c686d" }
+                borderColor: "rgba(11,108,255,0.18)",
+                fillerColor: "rgba(11,108,255,0.12)",
+                handleStyle: { color: "#0b6cff" },
+                textStyle: { color: "#656d78" }
             },
             {
                 type: "inside",
@@ -441,3 +446,52 @@ function initCityAutoload() {
 }
 
 document.addEventListener("DOMContentLoaded", initCityAutoload);
+
+function initScrollExperience() {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const sections = document.querySelectorAll(".main-content > section, .main-content > div");
+    sections.forEach((section) => {
+        section.classList.add("reveal");
+    });
+
+    if (reduceMotion || typeof IntersectionObserver === "undefined") {
+        sections.forEach((section) => section.classList.add("is-visible"));
+        return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+            }
+        });
+    }, {
+        threshold: 0.14,
+        rootMargin: "0px 0px -8% 0px"
+    });
+
+    sections.forEach((section, index) => {
+        section.style.transitionDelay = `${Math.min(index * 45, 180)}ms`;
+        observer.observe(section);
+    });
+
+    const heroVisual = document.querySelector("[data-parallax-visual]");
+    if (!heroVisual) return;
+    let ticking = false;
+    function updateParallax() {
+        const rect = heroVisual.getBoundingClientRect();
+        const progress = Math.max(-1, Math.min(1, rect.top / window.innerHeight));
+        heroVisual.style.transform = `translateY(${progress * -10}px) scale(${1 + Math.abs(progress) * 0.012})`;
+        ticking = false;
+    }
+    window.addEventListener("scroll", () => {
+        if (!ticking) {
+            window.requestAnimationFrame(updateParallax);
+            ticking = true;
+        }
+    }, { passive: true });
+    updateParallax();
+}
+
+document.addEventListener("DOMContentLoaded", initScrollExperience);

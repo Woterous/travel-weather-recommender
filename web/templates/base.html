@@ -13,8 +13,8 @@
             <a class="brand" href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">
                 <span class="brand-mark">TW</span>
                 <span>
-                    <strong>Travel Weather Recommender</strong>
-                    <small>旅游天气推荐与可视化系统</small>
+                    <strong>Travel Weather</strong>
+                    <small>全国城市旅游出行推荐</small>
                 </span>
             </a>
             <nav class="nav-links">
@@ -35,7 +35,7 @@
             {% endif %}
         {% endwith %}
 
-        <main class="main-content">
+        <main class="main-content page-transition">
             {% block content %}{% endblock %}
         </main>
     </div>
