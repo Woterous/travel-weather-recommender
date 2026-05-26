@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from config.cities import CityConfig
 from config.sources import build_forecast_api_url
+from config.pinyin import city_name_to_pinyin, is_tianqi_slug
 from crawler.fetcher import HttpClient
 from crawler.parser_utils import (
     cn_md_to_iso,
@@ -17,19 +18,12 @@ from crawler.parser_utils import (
 )
 
 
-TIANQI_PINYIN_ALIASES = {
-    "广州": "guangzhou",
-    "天津": "tianjin",
-    "天水": "tianshui",
-}
-
-
 def _forecast_page_urls(city: CityConfig) -> list[str]:
-    candidates = [city.pinyin, city.slug, TIANQI_PINYIN_ALIASES.get(city.name)]
+    candidates = [city.pinyin, city.slug, city_name_to_pinyin(city.name)]
     seen = set()
     urls = []
     for candidate in candidates:
-        if not candidate or candidate in seen:
+        if not is_tianqi_slug(candidate) or candidate in seen:
             continue
         seen.add(candidate)
         urls.append(f"https://www.tianqi.com/{candidate}/")

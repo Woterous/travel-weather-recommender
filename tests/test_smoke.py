@@ -12,6 +12,7 @@ if str(ROOT_DIR) not in sys.path:
 
 from app import app
 from config.cities import CityConfig
+from config.pinyin import city_name_to_pinyin
 from config.preferences import DEFAULT_PREFERENCES
 from service.city_search import city_from_search_payload
 from service.city_search import search_cities
@@ -108,6 +109,10 @@ class SearchAndModelTest(unittest.TestCase):
 
         self.assertEqual(city.slug, "geo-1809858")
         self.assertEqual(city.name, "广州")
+        self.assertEqual(city.pinyin, "guangzhou")
+
+    def test_city_name_to_pinyin_handles_new_admin_city(self) -> None:
+        self.assertEqual(city_name_to_pinyin("哈尔滨"), "haerbin")
 
     def test_added_city_record_is_persisted(self) -> None:
         original_db_path = database.DB_PATH
@@ -649,6 +654,7 @@ class RefreshProgressTest(unittest.TestCase):
 
         self.assertEqual(len(payload["records"]), 1)
         self.assertTrue(any("guangzhou" in url for url in client.urls))
+        self.assertTrue(all("geo-1809858" not in url for url in client.urls))
         self.assertEqual(payload["records"][0]["weather_detail"], "晴")
 
     def test_history_cache_current_when_covered_to_last_month(self) -> None:

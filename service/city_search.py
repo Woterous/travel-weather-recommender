@@ -6,6 +6,7 @@ from functools import lru_cache
 from pathlib import Path
 
 from config.cities import CITY_BY_SLUG, CityConfig
+from config.pinyin import city_name_to_pinyin
 from config.sources import build_geocoding_api_url
 from crawler.fetcher import HttpClient
 
@@ -234,7 +235,7 @@ def city_from_search_payload(payload: dict) -> CityConfig:
     return CityConfig(
         slug=slug,
         name=payload.get("name", "").strip() or "搜索城市",
-        pinyin=slug,
+        pinyin=city_name_to_pinyin(payload.get("name", "")) or slug,
         latitude=float(payload["latitude"]),
         longitude=float(payload["longitude"]),
     )
