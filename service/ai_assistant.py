@@ -33,6 +33,40 @@ def _safe_number(value, precision: int = 1, suffix: str = "") -> str:
     return f"{number:.{precision}f}{suffix}"
 
 
+def _date_from_parts(year: int, month: int, day: int) -> str | None:
+    try:
+        return date(year, month, day).isoformat()
+    except ValueError:
+        return None
+
+
+def _explicit_date_from_message(message: str, available_dates: list[str], today: date) -> str | None:
+    available = set(available_dates)
+    full_date = re.search(r"(?P<year>20\d{2})\s*(?:[-/年.])\s*(?P<month>\d{1,2})\s*(?:[-/月.])\s*(?P<day>\d{1,2})", message)
+    if full_date:
+        date_text = _date_from_parts(
+            int(full_date.group("year")),
+            int(full_date.group("month")),
+            int(full_date.group("day")),
+        )
+        if date_text in available:
+            return date_text
+
+    month_day_patterns = [
+        r"(?<!\d)(?P<month>\d{1,2})\s*月\s*(?P<day>\d{1,2})\s*(?:日|号)?",
+        r"(?<!\d)(?P<month>\d{1,2})\s*[./-]\s*(?P<day>\d{1,2})(?!\d)",
+    ]
+    for pattern in month_day_patterns:
+        for match in re.finditer(pattern, message):
+            month = int(match.group("month"))
+            day = int(match.group("day"))
+            for year in [today.year, today.year + 1, today.year - 1]:
+                date_text = _date_from_parts(year, month, day)
+                if date_text in available:
+                    return date_text
+    return None
+
+
 def _forecast_date(repository, requested_date: str | None, message: str = "") -> str:
     dates = repository.get_forecast_dates()
     if not dates:
@@ -49,21 +83,9 @@ def _forecast_date(repository, requested_date: str | None, message: str = "") ->
         if keyword in message and date_text in dates:
             return date_text
 
-    explicit = re.search(r"20\d{2}[-/年.]\d{1,2}[-/月.]\d{1,2}", message)
-    if explicit:
-        normalized = (
-            explicit.group(0)
-            .replace("年", "-")
-            .replace("月", "-")
-            .replace("/", "-")
-            .replace(".", "-")
-            .replace("日", "")
-        )
-        parts = [part for part in normalized.split("-") if part]
-        if len(parts) == 3:
-            date_text = f"{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
-            if date_text in dates:
-                return date_text
+    explicit_date = _explicit_date_from_message(message, dates, today)
+    if explicit_date:
+        return explicit_date
 
     if requested_date in dates:
         return requested_date or ""

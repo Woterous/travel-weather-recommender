@@ -83,7 +83,11 @@ class AppSmokeTest(unittest.TestCase):
     def test_local_assistant_question_date_overrides_page_date(self) -> None:
         with mock.patch("service.ai_assistant.date") as mocked_date:
             mocked_date.today.return_value = date(2026, 5, 31)
+            mocked_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
             self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "明天去哪里比较好"), "2026-06-01")
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "6月2日北京天气"), "2026-06-02")
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "06-02北京天气"), "2026-06-02")
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "6.2北京天气"), "2026-06-02")
 
     def test_history_month_defaults_to_current_month(self) -> None:
         self.assertEqual(_resolve_history_month(None, list(range(1, 13))), date.today().month)
