@@ -1943,18 +1943,6 @@ input[type="text"]:focus {
     line-height: 1;
 }
 
-.ai-toggle-dot {
-    position: absolute;
-    top: 9px;
-    right: 10px;
-    width: 12px;
-    height: 12px;
-    border: 2px solid #fff;
-    border-radius: 50%;
-    background: var(--accent);
-    box-shadow: 0 0 0 4px rgba(25, 169, 116, 0.12);
-}
-
 .ai-panel {
     position: absolute;
     right: 0;
@@ -2471,11 +2459,6 @@ input[type="text"]:focus {
 
     .ai-toggle-mark {
         display: none;
-    }
-
-    .ai-toggle-dot {
-        top: 8px;
-        right: 8px;
     }
 
     .ai-panel {
