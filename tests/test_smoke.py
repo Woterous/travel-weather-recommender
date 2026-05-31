@@ -190,6 +190,8 @@ class AppSmokeTest(unittest.TestCase):
         _, kwargs = mocked_post.call_args
         self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test-key")
         self.assertEqual(kwargs["json"]["model"], "glm-test")
+        self.assertEqual(kwargs["json"]["thinking"], {"type": "disabled"})
+        self.assertLessEqual(kwargs["json"]["max_tokens"], 256)
         self.assertEqual(kwargs["json"]["messages"][0]["role"], "system")
 
     def test_history_month_defaults_to_current_month(self) -> None:

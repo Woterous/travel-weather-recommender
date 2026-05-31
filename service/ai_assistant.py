@@ -16,7 +16,7 @@ from service.ranking import build_homepage_context
 
 PREFERENCE_KEYS = set(PREFERENCE_OPTIONS.keys())
 DEFAULT_GLM_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
-DEFAULT_GLM_MODEL = "glm-5.1"
+DEFAULT_GLM_MODEL = "glm-4-flash-250414"
 LOCAL_AI_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "local_ai.json"
 
 
@@ -64,7 +64,7 @@ def _preference_summary(preferences: dict) -> str:
 def _format_ai_context(context: dict) -> str:
     rows = context.get("ranking") or []
     row_lines = []
-    for index, row in enumerate(rows[:6], start=1):
+    for index, row in enumerate(rows[:3], start=1):
         row_lines.append(
             (
                 f"{index}. {row.get('city_name', '-')}：综合分{_safe_number(row.get('score_total'))}，"
@@ -109,14 +109,15 @@ def call_external_ai_provider(prompt: str, context: dict) -> str | None:
             },
         ],
         "temperature": 0.3,
-        "max_tokens": 1024,
+        "max_tokens": 256,
+        "thinking": {"type": "disabled"},
     }
     try:
         response = requests.post(
             endpoint,
             headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
             json=payload,
-            timeout=float(_ai_setting("timeout", ["TRAVEL_AI_TIMEOUT", "GLM_TIMEOUT"], "30")),
+            timeout=float(_ai_setting("timeout", ["TRAVEL_AI_TIMEOUT", "GLM_TIMEOUT"], "8")),
         )
         response.raise_for_status()
         data = response.json()
@@ -516,7 +517,7 @@ def answer_with_local_data(message: str, repository, payload: dict) -> dict:
             text,
             {
                 "selected_date": selected_date,
-                "ranking": ranking[:6],
+                "ranking": ranking[:3],
                 "preferences": preferences,
                 "local_answer": answer,
             },
