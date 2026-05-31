@@ -42,6 +42,43 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("answer", response.get_json())
 
+    def test_local_assistant_core_questions(self) -> None:
+        cases = [
+            ("今天推荐哪个城市", "推荐"),
+            ("北京适合去吗", "北京"),
+            ("哪个城市空气质量最好", "AQI"),
+            ("北京和南京哪个好", "更推荐"),
+            ("当前偏好怎么影响推荐", "当前偏好"),
+            ("历史稳定性哪个城市好", "历史"),
+        ]
+        for message, expected in cases:
+            with self.subTest(message=message):
+                response = self.client.post(
+                    "/api/assistant",
+                    json={
+                        "message": message,
+                        "selected_date": "2026-05-31",
+                        "preferences": DEFAULT_PREFERENCES,
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                payload = response.get_json()
+                self.assertEqual(payload["mode"], "local")
+                self.assertIn(expected, payload["answer"])
+
+    def test_local_assistant_uses_page_context(self) -> None:
+        response = self.client.post(
+            "/api/assistant",
+            json={
+                "message": "这个城市怎么样",
+                "selected_date": "2026-05-31",
+                "current_city_slug": "beijing",
+                "preferences": DEFAULT_PREFERENCES,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("北京", response.get_json()["answer"])
+
     def test_history_month_defaults_to_current_month(self) -> None:
         self.assertEqual(_resolve_history_month(None, list(range(1, 13))), date.today().month)
         self.assertEqual(_resolve_history_month("8", list(range(1, 13))), 8)

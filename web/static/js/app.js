@@ -145,6 +145,36 @@ function appendAiMessage(container, role, text) {
     container.scrollTop = container.scrollHeight;
 }
 
+function collectAssistantContext(message) {
+    const params = new URLSearchParams(window.location.search);
+    const preferences = {};
+    [
+        "rain_sensitivity",
+        "temperature_preference",
+        "wind_sensitivity",
+        "travel_style",
+        "aqi_sensitivity"
+    ].forEach((key) => {
+        if (params.get(key)) preferences[key] = params.get(key);
+    });
+    const payload = {
+        message,
+        preferences,
+        selected_date: params.get("date") || "",
+        page_path: window.location.pathname,
+        page_query: window.location.search
+    };
+    const cityMatch = window.location.pathname.match(/^\/city\/([^/?#]+)/);
+    if (cityMatch) {
+        payload.current_city_slug = decodeURIComponent(cityMatch[1]);
+    }
+    if (window.location.pathname === "/compare") {
+        payload.city_a = params.get("city_a") || "";
+        payload.city_b = params.get("city_b") || "";
+    }
+    return payload;
+}
+
 function initAssistant() {
     const panel = document.querySelector("[data-ai-panel]");
     const toggles = document.querySelectorAll("[data-ai-toggle]");
@@ -173,7 +203,7 @@ function initAssistant() {
             const response = await fetch("/api/assistant", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text })
+                body: JSON.stringify(collectAssistantContext(text))
             });
             const payload = await response.json();
             pending.textContent = payload.answer || "没有生成有效回答。";
