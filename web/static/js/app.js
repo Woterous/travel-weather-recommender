@@ -137,12 +137,51 @@ window.renderLineChart = function renderLineChart(elementId, payload) {
     window.addEventListener("resize", () => chart.resize());
 };
 
-function appendAiMessage(container, role, text) {
+function appendAiMessage(container, role, text, options = {}) {
     const node = document.createElement("div");
     node.className = `ai-message ${role}`;
-    node.textContent = text;
+    if (options.pending) {
+        node.classList.add("is-pending");
+    }
+
+    const avatar = document.createElement("span");
+    avatar.className = "ai-message-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.textContent = role === "user" ? "我" : "AI";
+
+    const bubble = document.createElement("div");
+    bubble.className = "ai-message-bubble";
+
+    const textNode = document.createElement("span");
+    textNode.className = "ai-message-text";
+    textNode.textContent = text;
+    bubble.appendChild(textNode);
+
+    if (options.pending) {
+        const dots = document.createElement("span");
+        dots.className = "ai-typing";
+        dots.setAttribute("aria-hidden", "true");
+        dots.innerHTML = "<span></span><span></span><span></span>";
+        bubble.appendChild(dots);
+    }
+
+    node.append(avatar, bubble);
     container.appendChild(node);
     container.scrollTop = container.scrollHeight;
+    return node;
+}
+
+function setAiMessageText(node, text) {
+    if (!node) return;
+    node.classList.remove("is-pending");
+    const textNode = node.querySelector(".ai-message-text");
+    if (textNode) {
+        textNode.textContent = text;
+    } else {
+        node.textContent = text;
+    }
+    const dots = node.querySelector(".ai-typing");
+    if (dots) dots.remove();
 }
 
 function collectAssistantContext(message) {
@@ -180,25 +219,45 @@ function initAssistant() {
     const toggles = document.querySelectorAll("[data-ai-toggle]");
     const form = document.querySelector("[data-ai-form]");
     const messages = document.querySelector("[data-ai-messages]");
+    const suggestions = document.querySelectorAll("[data-ai-suggestion]");
+    const mode = document.querySelector("[data-ai-mode]");
     if (!panel || !form || !messages) return;
     if (panel.dataset.aiReady === "1") return;
     panel.dataset.aiReady = "1";
 
+    const input = form.elements.message;
+    const submitButton = form.querySelector("button[type='submit']");
+
+    function setOpen(isOpen) {
+        panel.classList.toggle("open", isOpen);
+        panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+        toggles.forEach((toggle) => {
+            toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+        if (isOpen && input) {
+            window.setTimeout(() => input.focus(), 80);
+        }
+    }
+
+    function updateMode(text, state) {
+        if (!mode) return;
+        mode.textContent = text;
+        mode.dataset.state = state || "";
+    }
+
     toggles.forEach((toggle) => {
         toggle.addEventListener("click", () => {
-            panel.classList.toggle("open");
+            setOpen(!panel.classList.contains("open"));
         });
     });
 
-    form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const input = form.elements.message;
-        const text = input.value.trim();
+    async function sendMessage(text) {
         if (!text) return;
         appendAiMessage(messages, "user", text);
         input.value = "";
-        appendAiMessage(messages, "assistant", "正在查询本地推荐数据...");
-        const pending = messages.lastElementChild;
+        if (submitButton) submitButton.disabled = true;
+        updateMode("正在查询本地数据", "loading");
+        const pending = appendAiMessage(messages, "assistant", "正在查询本地推荐数据", { pending: true });
         try {
             const response = await fetch("/api/assistant", {
                 method: "POST",
@@ -206,19 +265,43 @@ function initAssistant() {
                 body: JSON.stringify(collectAssistantContext(text))
             });
             const payload = await response.json();
-            pending.textContent = payload.answer || "没有生成有效回答。";
+            setAiMessageText(pending, payload.answer || "没有生成有效回答。");
+            updateMode(payload.mode === "external" ? "外部模型回答" : "本地数据回答", payload.mode || "local");
         } catch (error) {
-            pending.textContent = "助手接口暂时不可用，请稍后再试。";
+            setAiMessageText(pending, "助手接口暂时不可用，请稍后再试。");
+            updateMode("连接失败", "error");
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+            if (input) input.focus();
+        }
+    }
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        sendMessage(text);
+    });
+
+    suggestions.forEach((button) => {
+        button.addEventListener("click", () => {
+            setOpen(true);
+            sendMessage(button.dataset.aiSuggestion || button.textContent.trim());
+        });
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && panel.classList.contains("open")) {
+            setOpen(false);
         }
     });
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("assistant") === "open") {
-        panel.classList.add("open");
+        setOpen(true);
         const demoQuestion = params.get("ask");
         if (demoQuestion) {
-            form.elements.message.value = demoQuestion;
-            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+            input.value = demoQuestion;
+            sendMessage(demoQuestion);
         }
     }
 }
