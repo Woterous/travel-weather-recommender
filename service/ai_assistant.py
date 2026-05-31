@@ -37,8 +37,6 @@ def _forecast_date(repository, requested_date: str | None, message: str = "") ->
     dates = repository.get_forecast_dates()
     if not dates:
         return ""
-    if requested_date in dates:
-        return requested_date or ""
 
     today = date.today()
     date_aliases = {
@@ -66,6 +64,9 @@ def _forecast_date(repository, requested_date: str | None, message: str = "") ->
             date_text = f"{int(parts[0]):04d}-{int(parts[1]):02d}-{int(parts[2]):02d}"
             if date_text in dates:
                 return date_text
+
+    if requested_date in dates:
+        return requested_date or ""
 
     for date_text in dates:
         if date_text >= today.isoformat():

@@ -22,6 +22,7 @@ from service.database import _sanitize_refresh_message
 from service import database
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
 from service import pipeline
+from service.ai_assistant import _forecast_date
 from service.ranking import _build_homepage_context_cached, build_homepage_context
 from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
@@ -78,6 +79,11 @@ class AppSmokeTest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("北京", response.get_json()["answer"])
+
+    def test_local_assistant_question_date_overrides_page_date(self) -> None:
+        with mock.patch("service.ai_assistant.date") as mocked_date:
+            mocked_date.today.return_value = date(2026, 5, 31)
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "明天去哪里比较好"), "2026-06-01")
 
     def test_history_month_defaults_to_current_month(self) -> None:
         self.assertEqual(_resolve_history_month(None, list(range(1, 13))), date.today().month)
