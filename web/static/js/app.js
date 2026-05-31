@@ -221,7 +221,6 @@ function initAssistant() {
     const form = document.querySelector("[data-ai-form]");
     const messages = document.querySelector("[data-ai-messages]");
     const suggestions = document.querySelectorAll("[data-ai-suggestion]");
-    const mode = document.querySelector("[data-ai-mode]");
     if (!panel || !form || !messages) return;
     if (panel.dataset.aiReady === "1") return;
     panel.dataset.aiReady = "1";
@@ -240,12 +239,6 @@ function initAssistant() {
         }
     }
 
-    function updateMode(text, state) {
-        if (!mode) return;
-        mode.textContent = text;
-        mode.dataset.state = state || "";
-    }
-
     toggles.forEach((toggle) => {
         toggle.addEventListener("click", () => {
             setOpen(!panel.classList.contains("open"));
@@ -257,7 +250,6 @@ function initAssistant() {
         appendAiMessage(messages, "user", text);
         input.value = "";
         if (submitButton) submitButton.disabled = true;
-        updateMode("正在查询本地数据", "loading");
         const pending = appendAiMessage(messages, "assistant", "正在查询本地推荐数据", { pending: true });
         try {
             const response = await fetch("/api/assistant", {
@@ -267,10 +259,8 @@ function initAssistant() {
             });
             const payload = await response.json();
             setAiMessageText(pending, payload.answer || "没有生成有效回答。");
-            updateMode(payload.mode === "external" ? "外部模型回答" : "本地数据回答", payload.mode || "local");
         } catch (error) {
             setAiMessageText(pending, "助手接口暂时不可用，请稍后再试。");
-            updateMode("连接失败", "error");
         } finally {
             if (submitButton) submitButton.disabled = false;
             if (input) input.focus();

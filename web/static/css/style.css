@@ -1989,32 +1989,7 @@ input[type="text"]:focus {
 
 .ai-panel-head strong {
     display: block;
-    margin-bottom: 4px;
     font-size: 1.02rem;
-}
-
-.ai-panel-head span {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    color: var(--muted);
-    font-size: 0.78rem;
-}
-
-.ai-panel-head span::before {
-    content: "";
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: var(--accent);
-}
-
-.ai-panel-head span[data-state="loading"]::before {
-    background: var(--warm);
-}
-
-.ai-panel-head span[data-state="error"]::before {
-    background: var(--danger);
 }
 
 .ai-panel-head button {
