@@ -198,6 +198,7 @@ function collectAssistantContext(message) {
     });
     const payload = {
         message,
+        use_external_ai: true,
         preferences,
         selected_date: params.get("date") || "",
         page_path: window.location.pathname,

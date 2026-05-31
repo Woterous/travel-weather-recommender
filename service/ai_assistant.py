@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import json
 import os
 import re
 from datetime import date, timedelta
+from pathlib import Path
+
+import requests
 
 from config.preferences import PREFERENCE_OPTIONS, normalize_preferences, preference_label
 from service.compare import build_compare_context
@@ -11,14 +15,127 @@ from service.ranking import build_homepage_context
 
 
 PREFERENCE_KEYS = set(PREFERENCE_OPTIONS.keys())
+DEFAULT_GLM_ENDPOINT = "https://open.bigmodel.cn/api/paas/v4/chat/completions"
+DEFAULT_GLM_MODEL = "glm-5.1"
+LOCAL_AI_CONFIG_PATH = Path(__file__).resolve().parents[1] / "config" / "local_ai.json"
+
+
+def _load_local_ai_config() -> dict:
+    if not LOCAL_AI_CONFIG_PATH.exists():
+        return {}
+    try:
+        with LOCAL_AI_CONFIG_PATH.open("r", encoding="utf-8") as file:
+            config = json.load(file)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return config if isinstance(config, dict) else {}
+
+
+def _ai_setting(config_key: str, env_names: list[str], default: str = "") -> str:
+    for env_name in env_names:
+        value = os.getenv(env_name)
+        if value:
+            return value.strip()
+    value = _load_local_ai_config().get(config_key)
+    return str(value).strip() if value else default
+
+
+def _external_ai_requested(payload: dict) -> bool:
+    if str(os.getenv("TRAVEL_AI_DISABLE", "")).lower() in {"1", "true", "yes", "on"}:
+        return False
+    value = payload.get("use_external_ai") if isinstance(payload, dict) else False
+    if isinstance(value, bool):
+        return value
+    return str(value).lower() in {"1", "true", "yes", "on"}
+
+
+def _preference_summary(preferences: dict) -> str:
+    return "、".join(
+        [
+            preference_label("travel_style", preferences["travel_style"]),
+            preference_label("temperature_preference", preferences["temperature_preference"]),
+            preference_label("rain_sensitivity", preferences["rain_sensitivity"]),
+            preference_label("wind_sensitivity", preferences["wind_sensitivity"]),
+            preference_label("aqi_sensitivity", preferences["aqi_sensitivity"]),
+        ]
+    )
+
+
+def _format_ai_context(context: dict) -> str:
+    rows = context.get("ranking") or []
+    row_lines = []
+    for index, row in enumerate(rows[:6], start=1):
+        row_lines.append(
+            (
+                f"{index}. {row.get('city_name', '-')}：综合分{_safe_number(row.get('score_total'))}，"
+                f"天气{row.get('weather_detail', '-')}，均温{_safe_number(row.get('avg_temp'), 1, '℃')}，"
+                f"降水{'有风险' if row.get('rain_flag') else '风险低'}，AQI{_safe_number(row.get('aqi'), 0)}，"
+                f"原因：{row.get('reason', '')}"
+            )
+        )
+    selected_date = context.get("selected_date") or "-"
+    preferences = context.get("preferences") or {}
+    preference_text = _preference_summary(preferences) if preferences else "-"
+    local_answer = context.get("local_answer") or ""
+    return (
+        f"当前日期：{selected_date}\n"
+        f"用户偏好：{preference_text}\n"
+        f"本地规则答案：{local_answer}\n"
+        "推荐数据：\n"
+        + "\n".join(row_lines)
+    )
 
 
 def call_external_ai_provider(prompt: str, context: dict) -> str | None:
-    endpoint = os.getenv("TRAVEL_AI_ENDPOINT")
-    api_key = os.getenv("TRAVEL_AI_API_KEY")
+    endpoint = _ai_setting("endpoint", ["TRAVEL_AI_ENDPOINT", "GLM_ENDPOINT"], DEFAULT_GLM_ENDPOINT)
+    api_key = _ai_setting("api_key", ["TRAVEL_AI_API_KEY", "GLM_API_KEY", "ZHIPUAI_API_KEY"])
+    model = _ai_setting("model", ["TRAVEL_AI_MODEL", "GLM_MODEL"], DEFAULT_GLM_MODEL)
     if not endpoint or not api_key:
         return None
-    return None
+    payload = {
+        "model": model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "你是旅行天气推荐系统中的中文助手。必须以提供的本地天气、AQI、评分和偏好数据为依据回答，"
+                    "不要编造未提供的实时天气或排名。若数据不足，直接说明。回答要自然、简洁，并给出清晰建议。"
+                ),
+            },
+            {
+                "role": "user",
+                "content": f"用户问题：{prompt}\n\n可用上下文：\n{_format_ai_context(context)}",
+            },
+        ],
+        "temperature": 0.3,
+        "max_tokens": 1024,
+    }
+    try:
+        response = requests.post(
+            endpoint,
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=float(_ai_setting("timeout", ["TRAVEL_AI_TIMEOUT", "GLM_TIMEOUT"], "30")),
+        )
+        response.raise_for_status()
+        data = response.json()
+    except (requests.RequestException, ValueError, TypeError):
+        return None
+    choices = data.get("choices") if isinstance(data, dict) else None
+    if not choices:
+        return None
+    message = choices[0].get("message") if isinstance(choices[0], dict) else {}
+    content = message.get("content") if isinstance(message, dict) else None
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, dict) and item.get("text"):
+                parts.append(str(item["text"]))
+            elif isinstance(item, str):
+                parts.append(item)
+        content = "\n".join(parts)
+    answer = str(content or "").strip()
+    return answer or None
 
 
 def _safe_number(value, precision: int = 1, suffix: str = "") -> str:
@@ -311,7 +428,17 @@ def answer_with_local_data(message: str, repository, payload: dict) -> dict:
             f"当前日期是 {selected_date}，你也可以直接问“北京适合去吗？”或“北京和上海哪个好？”。"
         )
 
-    external = call_external_ai_provider(text, {"selected_date": selected_date, "ranking": ranking[:5], "preferences": preferences})
+    external = None
+    if _external_ai_requested(payload):
+        external = call_external_ai_provider(
+            text,
+            {
+                "selected_date": selected_date,
+                "ranking": ranking[:6],
+                "preferences": preferences,
+                "local_answer": answer,
+            },
+        )
     return {
         "answer": external or answer,
         "mode": "external" if external else "local",
