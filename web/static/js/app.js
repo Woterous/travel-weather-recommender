@@ -171,10 +171,60 @@ function appendAiMessage(container, role, text, options = {}) {
     return node;
 }
 
-function setAiMessageText(node, text) {
+function buildAiCard(card) {
+    const article = document.createElement("article");
+    article.className = "ai-result-card";
+
+    const head = document.createElement("div");
+    head.className = "ai-result-card-head";
+    const title = document.createElement("strong");
+    title.textContent = card.title || "城市";
+    const score = document.createElement("span");
+    score.textContent = card.score && card.score !== "-" ? `${card.score} 分` : card.subtitle || "";
+    head.append(title, score);
+    article.appendChild(head);
+
+    if (Array.isArray(card.tags) && card.tags.length) {
+        const tags = document.createElement("div");
+        tags.className = "ai-result-tags";
+        card.tags.forEach((tag) => {
+            const node = document.createElement("span");
+            node.textContent = tag;
+            tags.appendChild(node);
+        });
+        article.appendChild(tags);
+    }
+
+    if (Array.isArray(card.metrics) && card.metrics.length) {
+        const metrics = document.createElement("dl");
+        metrics.className = "ai-result-metrics";
+        card.metrics.forEach((metric) => {
+            const item = document.createElement("div");
+            const label = document.createElement("dt");
+            const value = document.createElement("dd");
+            label.textContent = metric.label || "";
+            value.textContent = metric.value || "-";
+            item.append(label, value);
+            metrics.appendChild(item);
+        });
+        article.appendChild(metrics);
+    }
+
+    if (card.reason) {
+        const reason = document.createElement("p");
+        reason.textContent = card.reason;
+        article.appendChild(reason);
+    }
+    return article;
+}
+
+function setAiMessageContent(node, payload) {
     if (!node) return;
     node.classList.remove("is-pending");
-    const textNode = node.querySelector(".ai-message-text");
+    const bubble = node.querySelector(".ai-message-bubble");
+    const text = typeof payload === "string" ? payload : (payload && payload.answer) || "没有生成有效回答。";
+    const cards = payload && Array.isArray(payload.cards) ? payload.cards : [];
+    const textNode = bubble ? bubble.querySelector(".ai-message-text") : node.querySelector(".ai-message-text");
     if (textNode) {
         textNode.textContent = text;
     } else {
@@ -182,6 +232,23 @@ function setAiMessageText(node, text) {
     }
     const dots = node.querySelector(".ai-typing");
     if (dots) dots.remove();
+    node.classList.toggle("has-cards", cards.length > 0);
+    if (bubble) {
+        bubble.querySelectorAll(".ai-card-stack").forEach((stack) => stack.remove());
+        if (cards.length) {
+            const stack = document.createElement("div");
+            stack.className = "ai-card-stack";
+            cards.forEach((card) => stack.appendChild(buildAiCard(card)));
+            bubble.appendChild(stack);
+        }
+    }
+    if (node.parentElement) {
+        node.parentElement.scrollTop = node.parentElement.scrollHeight;
+    }
+}
+
+function setAiMessageText(node, text) {
+    setAiMessageContent(node, text);
 }
 
 function collectAssistantContext(message) {
@@ -258,7 +325,7 @@ function initAssistant() {
                 body: JSON.stringify(collectAssistantContext(text))
             });
             const payload = await response.json();
-            setAiMessageText(pending, payload.answer || "没有生成有效回答。");
+            setAiMessageContent(pending, payload);
         } catch (error) {
             setAiMessageText(pending, "助手接口暂时不可用，请稍后再试。");
         } finally {

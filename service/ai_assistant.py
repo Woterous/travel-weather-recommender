@@ -99,7 +99,8 @@ def call_external_ai_provider(prompt: str, context: dict) -> str | None:
                 "role": "system",
                 "content": (
                     "你是旅行天气推荐系统中的中文助手。必须以提供的本地天气、AQI、评分和偏好数据为依据回答，"
-                    "不要编造未提供的实时天气或排名。若数据不足，直接说明。回答要自然、简洁，并给出清晰建议。"
+                    "不要编造未提供的实时天气或排名。若数据不足，直接说明。回答要自然、简洁，控制在两句话以内。"
+                    "不要使用 Markdown，不要使用星号、标题、列表或表格。"
                 ),
             },
             {
@@ -134,8 +135,16 @@ def call_external_ai_provider(prompt: str, context: dict) -> str | None:
             elif isinstance(item, str):
                 parts.append(item)
         content = "\n".join(parts)
-    answer = str(content or "").strip()
+    answer = _clean_answer_text(str(content or "").strip())
     return answer or None
+
+
+def _clean_answer_text(answer: str) -> str:
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", answer or "")
+    text = re.sub(r"__(.*?)__", r"\1", text)
+    text = re.sub(r"^\s*[-*]\s+", "", text, flags=re.MULTILINE)
+    text = re.sub(r"\n{3,}", "\n\n", text)
+    return text.strip()
 
 
 def _safe_number(value, precision: int = 1, suffix: str = "") -> str:
@@ -285,6 +294,72 @@ def _row_summary(row: dict) -> str:
     )
 
 
+def _short_reason(row: dict) -> str:
+    reason = str(row.get("reason", "") or "").strip()
+    if not reason:
+        return "本地评分显示该城市当前出行条件较均衡。"
+    return reason if len(reason) <= 52 else reason[:50].rstrip("，。； ") + "..."
+
+
+def _city_result_card(row: dict, rank: int | None = None, label: str = "") -> dict:
+    title = str(row.get("city_name") or row.get("city_slug") or "城市")
+    score = _safe_number(row.get("score_total"))
+    metrics = [
+        {"label": "天气", "value": str(row.get("weather_detail") or "-")},
+        {"label": "均温", "value": _safe_number(row.get("avg_temp"), 1, "℃")},
+        {"label": "AQI", "value": _safe_number(row.get("aqi"), 0)},
+        {"label": "降水", "value": "有风险" if row.get("rain_flag") else "风险低"},
+    ]
+    tags = []
+    if rank:
+        tags.append(f"#{rank}")
+    if label:
+        tags.append(label)
+    if row.get("rain_flag"):
+        tags.append("注意降水")
+    else:
+        tags.append("少雨")
+    return {
+        "type": "city",
+        "title": title,
+        "subtitle": f"综合分 {score}",
+        "score": score,
+        "metrics": metrics,
+        "tags": tags[:3],
+        "reason": _short_reason(row),
+    }
+
+
+def _build_answer_cards(intent: str, ranking: list[dict], city_mentions: list[dict], explicit_mentioned: dict | None) -> list[dict]:
+    if not ranking:
+        return []
+    cards = []
+    seen = set()
+    card_limit = 3 if intent == "recommendation" else 2 if intent in {"compare", "aqi"} else 1
+
+    def add(row: dict, rank: int | None = None, label: str = "") -> None:
+        slug = str(row.get("city_slug") or row.get("city_name") or "")
+        if not slug or slug in seen or len(cards) >= card_limit:
+            return
+        seen.add(slug)
+        cards.append(_city_result_card(row, rank=rank, label=label))
+
+    rank_by_slug = {str(row.get("city_slug", "")): index for index, row in enumerate(ranking, start=1)}
+    if intent == "compare" and len(city_mentions) >= 2:
+        add(city_mentions[0], rank_by_slug.get(str(city_mentions[0].get("city_slug"))), "对比城市")
+        add(city_mentions[1], rank_by_slug.get(str(city_mentions[1].get("city_slug"))), "对比城市")
+    elif intent == "city" and explicit_mentioned:
+        add(explicit_mentioned, rank_by_slug.get(str(explicit_mentioned.get("city_slug"))), "当前城市")
+    elif intent == "aqi":
+        rows = [row for row in ranking if _safe_number(row.get("aqi"), 0) != "-"]
+        rows.sort(key=lambda item: float(item.get("aqi") or 9999))
+        if rows:
+            add(rows[0], rank_by_slug.get(str(rows[0].get("city_slug"))), "空气较好")
+    for index, row in enumerate(ranking[:3], start=1):
+        add(row, index, "推荐")
+    return cards
+
+
 def _answer_recommendation(selected_date: str, ranking: list[dict]) -> str:
     top = ranking[0]
     next_rows = "、".join(
@@ -409,17 +484,24 @@ def answer_with_local_data(message: str, repository, payload: dict) -> dict:
     mentioned = city_mentions[0] if city_mentions else None
     lower_text = text.lower()
 
+    intent = "fallback"
     if any(keyword in text for keyword in ["历史", "稳定", "往年", "月度", "哪个月"]):
+        intent = "history"
         answer = _answer_history(repository, text)
     elif any(keyword in text for keyword in ["对比", "哪个更", "哪个好", "哪一个好", "比"]) and len(city_mentions) >= 2:
+        intent = "compare"
         answer = _answer_compare(repository, selected_date, preferences, city_mentions[0], city_mentions[1])
     elif any(keyword in text for keyword in ["空气", "AQI", "aqi", "污染", "雾霾"]):
+        intent = "aqi"
         answer = _answer_aqi(selected_date, ranking, explicit_mentioned)
     elif any(keyword in text for keyword in ["偏好", "模式", "怕下雨", "下雨", "户外", "城市漫步", "海滨", "温和", "凉爽", "偏暖"]):
+        intent = "preference"
         answer = _answer_preference(preferences, ranking)
     elif any(keyword in lower_text for keyword in ["recommend", "best"]) or any(keyword in text for keyword in ["推荐", "去哪", "去哪里", "哪个城市", "排行", "第一"]):
+        intent = "recommendation"
         answer = _answer_recommendation(selected_date, ranking)
     elif mentioned:
+        intent = "city"
         answer = _answer_city(selected_date, mentioned)
     else:
         answer = (
@@ -439,8 +521,10 @@ def answer_with_local_data(message: str, repository, payload: dict) -> dict:
                 "local_answer": answer,
             },
         )
+    answer = _clean_answer_text(external or answer)
     return {
-        "answer": external or answer,
+        "answer": answer,
+        "cards": _build_answer_cards(intent, ranking, city_mentions, explicit_mentioned),
         "mode": "external" if external else "local",
         "selected_date": selected_date,
     }

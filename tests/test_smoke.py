@@ -105,6 +105,8 @@ class AppSmokeTest(unittest.TestCase):
         payload = response.get_json()
         self.assertEqual(payload["mode"], "external")
         self.assertEqual(payload["answer"], "GLM 模型回答")
+        self.assertIn("cards", payload)
+        self.assertTrue(payload["cards"])
         mocked_external.assert_called_once()
 
     def test_assistant_keeps_local_mode_unless_external_requested(self) -> None:
@@ -121,6 +123,40 @@ class AppSmokeTest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.get_json()["mode"], "local")
         mocked_external.assert_not_called()
+
+    def test_assistant_returns_structured_cards(self) -> None:
+        response = self.client.post(
+            "/api/assistant",
+            json={
+                "message": "今天推荐哪个城市",
+                "selected_date": "2026-05-31",
+                "preferences": DEFAULT_PREFERENCES,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertGreaterEqual(len(payload["cards"]), 1)
+        first = payload["cards"][0]
+        self.assertEqual(first["type"], "city")
+        self.assertIn("title", first)
+        self.assertIn("metrics", first)
+        self.assertTrue(any(metric["label"] == "AQI" for metric in first["metrics"]))
+
+    def test_assistant_cleans_markdown_from_model_answer(self) -> None:
+        with mock.patch("service.ai_assistant.call_external_ai_provider", return_value="今天推荐**天水**，因为少雨。"):
+            response = self.client.post(
+                "/api/assistant",
+                json={
+                    "message": "今天推荐哪个城市",
+                    "selected_date": "2026-05-31",
+                    "preferences": DEFAULT_PREFERENCES,
+                    "use_external_ai": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("**", response.get_json()["answer"])
 
     def test_glm_provider_posts_openai_compatible_payload(self) -> None:
         class FakeResponse:
