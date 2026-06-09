@@ -20,7 +20,7 @@
     <form method="get" action="{{ url_for('history_page') }}" class="card filter-form" data-auto-submit-form>
         <label>城市</label>
         <select name="city" aria-label="城市">
-            {% for item in cities %}
+            {% for item in city_options %}
                 <option value="{{ item.slug }}" {% if item.slug == city.slug %}selected{% endif %}>{{ item.name }}</option>
             {% endfor %}
         </select>
