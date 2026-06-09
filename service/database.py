@@ -232,19 +232,39 @@ class WeatherRepository:
             connection.close()
 
     def get_forecast_dates(self) -> list[str]:
-        df = self._read_df("SELECT DISTINCT date FROM forecast_daily ORDER BY date")
+        df = self._read_df(
+            """
+            SELECT DISTINCT forecast_daily.date
+            FROM forecast_daily
+            INNER JOIN added_cities ON added_cities.slug = forecast_daily.city_slug
+            ORDER BY forecast_daily.date
+            """
+        )
         return df["date"].tolist()
 
     def get_forecast_for_date(self, date_text: str) -> pd.DataFrame:
         return self._read_df(
-            "SELECT * FROM forecast_daily WHERE date = ? ORDER BY city_slug",
+            """
+            SELECT forecast_daily.*
+            FROM forecast_daily
+            INNER JOIN added_cities ON added_cities.slug = forecast_daily.city_slug
+            WHERE forecast_daily.date = ?
+            ORDER BY forecast_daily.city_slug
+            """,
             (date_text,),
         )
 
     def get_forecast_daily(self, city_slug: str | None = None) -> pd.DataFrame:
         if city_slug:
             return self.get_city_forecast(city_slug)
-        return self._read_df("SELECT * FROM forecast_daily ORDER BY date, city_slug")
+        return self._read_df(
+            """
+            SELECT forecast_daily.*
+            FROM forecast_daily
+            INNER JOIN added_cities ON added_cities.slug = forecast_daily.city_slug
+            ORDER BY forecast_daily.date, forecast_daily.city_slug
+            """
+        )
 
     def get_city_forecast(self, city_slug: str) -> pd.DataFrame:
         return self._read_df(
@@ -472,7 +492,14 @@ class WeatherRepository:
                 "SELECT * FROM history_monthly WHERE city_slug = ? ORDER BY month_key",
                 (city_slug,),
             )
-        return self._read_df("SELECT * FROM history_monthly ORDER BY city_slug, month_key")
+        return self._read_df(
+            """
+            SELECT history_monthly.*
+            FROM history_monthly
+            INNER JOIN added_cities ON added_cities.slug = history_monthly.city_slug
+            ORDER BY history_monthly.city_slug, history_monthly.month_key
+            """
+        )
 
     def get_history_daily(self, city_slug: str | None = None) -> pd.DataFrame:
         if city_slug:
@@ -480,7 +507,14 @@ class WeatherRepository:
                 "SELECT * FROM history_daily WHERE city_slug = ? ORDER BY date",
                 (city_slug,),
             )
-        return self._read_df("SELECT * FROM history_daily ORDER BY city_slug, date")
+        return self._read_df(
+            """
+            SELECT history_daily.*
+            FROM history_daily
+            INNER JOIN added_cities ON added_cities.slug = history_daily.city_slug
+            ORDER BY history_daily.city_slug, history_daily.date
+            """
+        )
 
     def get_history_daily_coverage(self, city_slug: str) -> dict:
         df = self._read_df(
@@ -534,5 +568,11 @@ class WeatherRepository:
         return row
 
     def aqi_available(self) -> bool:
-        df = self._read_df("SELECT MAX(aqi) AS max_aqi FROM forecast_daily")
+        df = self._read_df(
+            """
+            SELECT MAX(forecast_daily.aqi) AS max_aqi
+            FROM forecast_daily
+            INNER JOIN added_cities ON added_cities.slug = forecast_daily.city_slug
+            """
+        )
         return not df.empty and pd.notna(df.iloc[0]["max_aqi"])

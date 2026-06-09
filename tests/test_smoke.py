@@ -22,6 +22,7 @@ from service.database import _sanitize_refresh_message
 from service import database
 from service.ml_predictor import TravelSuitabilityKnnModel, WeatherKnnForecastModel
 from service import pipeline
+from service.ai_assistant import _forecast_date, call_external_ai_provider
 from service.ranking import _build_homepage_context_cached, build_homepage_context
 from service.refresh_progress import RefreshJobStore
 from service.scoring import build_weights
@@ -41,6 +42,157 @@ class AppSmokeTest(unittest.TestCase):
         response = self.client.post("/api/assistant", json={"message": "今天推荐哪个城市"})
         self.assertEqual(response.status_code, 200)
         self.assertIn("answer", response.get_json())
+
+    def test_local_assistant_core_questions(self) -> None:
+        cases = [
+            ("今天推荐哪个城市", "推荐"),
+            ("北京适合去吗", "北京"),
+            ("哪个城市空气质量最好", "AQI"),
+            ("北京和南京哪个好", "更推荐"),
+            ("当前偏好怎么影响推荐", "当前偏好"),
+            ("历史稳定性哪个城市好", "历史"),
+        ]
+        for message, expected in cases:
+            with self.subTest(message=message):
+                response = self.client.post(
+                    "/api/assistant",
+                    json={
+                        "message": message,
+                        "selected_date": "2026-05-31",
+                        "preferences": DEFAULT_PREFERENCES,
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                payload = response.get_json()
+                self.assertEqual(payload["mode"], "local")
+                self.assertIn(expected, payload["answer"])
+
+    def test_local_assistant_uses_page_context(self) -> None:
+        response = self.client.post(
+            "/api/assistant",
+            json={
+                "message": "这个城市怎么样",
+                "selected_date": "2026-05-31",
+                "current_city_slug": "beijing",
+                "preferences": DEFAULT_PREFERENCES,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("北京", response.get_json()["answer"])
+
+    def test_local_assistant_question_date_overrides_page_date(self) -> None:
+        with mock.patch("service.ai_assistant.date") as mocked_date:
+            mocked_date.today.return_value = date(2026, 5, 31)
+            mocked_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "明天去哪里比较好"), "2026-06-01")
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "6月2日北京天气"), "2026-06-02")
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "06-02北京天气"), "2026-06-02")
+            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "6.2北京天气"), "2026-06-02")
+
+    def test_assistant_uses_external_model_when_requested(self) -> None:
+        with mock.patch("service.ai_assistant.call_external_ai_provider", return_value="GLM 模型回答") as mocked_external:
+            response = self.client.post(
+                "/api/assistant",
+                json={
+                    "message": "今天推荐哪个城市",
+                    "selected_date": "2026-05-31",
+                    "preferences": DEFAULT_PREFERENCES,
+                    "use_external_ai": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertEqual(payload["mode"], "external")
+        self.assertEqual(payload["answer"], "GLM 模型回答")
+        self.assertIn("cards", payload)
+        self.assertTrue(payload["cards"])
+        mocked_external.assert_called_once()
+
+    def test_assistant_keeps_local_mode_unless_external_requested(self) -> None:
+        with mock.patch("service.ai_assistant.call_external_ai_provider", return_value="GLM 模型回答") as mocked_external:
+            response = self.client.post(
+                "/api/assistant",
+                json={
+                    "message": "今天推荐哪个城市",
+                    "selected_date": "2026-05-31",
+                    "preferences": DEFAULT_PREFERENCES,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.get_json()["mode"], "local")
+        mocked_external.assert_not_called()
+
+    def test_assistant_returns_structured_cards(self) -> None:
+        response = self.client.post(
+            "/api/assistant",
+            json={
+                "message": "今天推荐哪个城市",
+                "selected_date": "2026-05-31",
+                "preferences": DEFAULT_PREFERENCES,
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertGreaterEqual(len(payload["cards"]), 1)
+        first = payload["cards"][0]
+        self.assertEqual(first["type"], "city")
+        self.assertIn("title", first)
+        self.assertIn("metrics", first)
+        self.assertTrue(any(metric["label"] == "AQI" for metric in first["metrics"]))
+
+    def test_assistant_cleans_markdown_from_model_answer(self) -> None:
+        with mock.patch("service.ai_assistant.call_external_ai_provider", return_value="今天推荐**天水**，因为少雨。"):
+            response = self.client.post(
+                "/api/assistant",
+                json={
+                    "message": "今天推荐哪个城市",
+                    "selected_date": "2026-05-31",
+                    "preferences": DEFAULT_PREFERENCES,
+                    "use_external_ai": True,
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("**", response.get_json()["answer"])
+
+    def test_glm_provider_posts_openai_compatible_payload(self) -> None:
+        class FakeResponse:
+            def raise_for_status(self) -> None:
+                return None
+
+            def json(self) -> dict:
+                return {"choices": [{"message": {"content": "模型已结合本地数据回答。"}}]}
+
+        with mock.patch.dict(
+            "os.environ",
+            {
+                "TRAVEL_AI_API_KEY": "test-key",
+                "TRAVEL_AI_ENDPOINT": "https://example.test/chat/completions",
+                "TRAVEL_AI_MODEL": "glm-test",
+                "TRAVEL_AI_TIMEOUT": "1",
+            },
+        ), mock.patch("service.ai_assistant.requests.post", return_value=FakeResponse()) as mocked_post:
+            answer = call_external_ai_provider(
+                "今天推荐哪个城市",
+                {
+                    "selected_date": "2026-05-31",
+                    "ranking": [],
+                    "preferences": DEFAULT_PREFERENCES,
+                    "local_answer": "本地推荐北京。",
+                },
+            )
+
+        self.assertEqual(answer, "模型已结合本地数据回答。")
+        mocked_post.assert_called_once()
+        _, kwargs = mocked_post.call_args
+        self.assertEqual(kwargs["headers"]["Authorization"], "Bearer test-key")
+        self.assertEqual(kwargs["json"]["model"], "glm-test")
+        self.assertEqual(kwargs["json"]["thinking"], {"type": "disabled"})
+        self.assertLessEqual(kwargs["json"]["max_tokens"], 256)
+        self.assertEqual(kwargs["json"]["messages"][0]["role"], "system")
 
     def test_history_month_defaults_to_current_month(self) -> None:
         self.assertEqual(_resolve_history_month(None, list(range(1, 13))), date.today().month)

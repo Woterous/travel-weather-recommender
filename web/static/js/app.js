@@ -137,12 +137,149 @@ window.renderLineChart = function renderLineChart(elementId, payload) {
     window.addEventListener("resize", () => chart.resize());
 };
 
-function appendAiMessage(container, role, text) {
+function appendAiMessage(container, role, text, options = {}) {
     const node = document.createElement("div");
     node.className = `ai-message ${role}`;
-    node.textContent = text;
+    if (options.pending) {
+        node.classList.add("is-pending");
+    }
+
+    const avatar = document.createElement("span");
+    avatar.className = "ai-message-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    avatar.textContent = role === "user" ? "我" : "AI";
+
+    const bubble = document.createElement("div");
+    bubble.className = "ai-message-bubble";
+
+    const textNode = document.createElement("span");
+    textNode.className = "ai-message-text";
+    textNode.textContent = text;
+    bubble.appendChild(textNode);
+
+    if (options.pending) {
+        const dots = document.createElement("span");
+        dots.className = "ai-typing";
+        dots.setAttribute("aria-hidden", "true");
+        dots.innerHTML = "<span></span><span></span><span></span>";
+        bubble.appendChild(dots);
+    }
+
+    node.append(avatar, bubble);
     container.appendChild(node);
     container.scrollTop = container.scrollHeight;
+    return node;
+}
+
+function buildAiCard(card) {
+    const article = document.createElement("article");
+    article.className = "ai-result-card";
+
+    const head = document.createElement("div");
+    head.className = "ai-result-card-head";
+    const title = document.createElement("strong");
+    title.textContent = card.title || "城市";
+    const score = document.createElement("span");
+    score.textContent = card.score && card.score !== "-" ? `${card.score} 分` : card.subtitle || "";
+    head.append(title, score);
+    article.appendChild(head);
+
+    if (Array.isArray(card.tags) && card.tags.length) {
+        const tags = document.createElement("div");
+        tags.className = "ai-result-tags";
+        card.tags.forEach((tag) => {
+            const node = document.createElement("span");
+            node.textContent = tag;
+            tags.appendChild(node);
+        });
+        article.appendChild(tags);
+    }
+
+    if (Array.isArray(card.metrics) && card.metrics.length) {
+        const metrics = document.createElement("dl");
+        metrics.className = "ai-result-metrics";
+        card.metrics.forEach((metric) => {
+            const item = document.createElement("div");
+            const label = document.createElement("dt");
+            const value = document.createElement("dd");
+            label.textContent = metric.label || "";
+            value.textContent = metric.value || "-";
+            item.append(label, value);
+            metrics.appendChild(item);
+        });
+        article.appendChild(metrics);
+    }
+
+    if (card.reason) {
+        const reason = document.createElement("p");
+        reason.textContent = card.reason;
+        article.appendChild(reason);
+    }
+    return article;
+}
+
+function setAiMessageContent(node, payload) {
+    if (!node) return;
+    node.classList.remove("is-pending");
+    const bubble = node.querySelector(".ai-message-bubble");
+    const text = typeof payload === "string" ? payload : (payload && payload.answer) || "没有生成有效回答。";
+    const cards = payload && Array.isArray(payload.cards) ? payload.cards : [];
+    const textNode = bubble ? bubble.querySelector(".ai-message-text") : node.querySelector(".ai-message-text");
+    if (textNode) {
+        textNode.textContent = text;
+    } else {
+        node.textContent = text;
+    }
+    const dots = node.querySelector(".ai-typing");
+    if (dots) dots.remove();
+    node.classList.toggle("has-cards", cards.length > 0);
+    if (bubble) {
+        bubble.querySelectorAll(".ai-card-stack").forEach((stack) => stack.remove());
+        if (cards.length) {
+            const stack = document.createElement("div");
+            stack.className = "ai-card-stack";
+            cards.forEach((card) => stack.appendChild(buildAiCard(card)));
+            bubble.appendChild(stack);
+        }
+    }
+    if (node.parentElement) {
+        node.parentElement.scrollTop = node.parentElement.scrollHeight;
+    }
+}
+
+function setAiMessageText(node, text) {
+    setAiMessageContent(node, text);
+}
+
+function collectAssistantContext(message) {
+    const params = new URLSearchParams(window.location.search);
+    const preferences = {};
+    [
+        "rain_sensitivity",
+        "temperature_preference",
+        "wind_sensitivity",
+        "travel_style",
+        "aqi_sensitivity"
+    ].forEach((key) => {
+        if (params.get(key)) preferences[key] = params.get(key);
+    });
+    const payload = {
+        message,
+        use_external_ai: true,
+        preferences,
+        selected_date: params.get("date") || "",
+        page_path: window.location.pathname,
+        page_query: window.location.search
+    };
+    const cityMatch = window.location.pathname.match(/^\/city\/([^/?#]+)/);
+    if (cityMatch) {
+        payload.current_city_slug = decodeURIComponent(cityMatch[1]);
+    }
+    if (window.location.pathname === "/compare") {
+        payload.city_a = params.get("city_a") || "";
+        payload.city_b = params.get("city_b") || "";
+    }
+    return payload;
 }
 
 function initAssistant() {
@@ -150,45 +287,79 @@ function initAssistant() {
     const toggles = document.querySelectorAll("[data-ai-toggle]");
     const form = document.querySelector("[data-ai-form]");
     const messages = document.querySelector("[data-ai-messages]");
+    const suggestions = document.querySelectorAll("[data-ai-suggestion]");
     if (!panel || !form || !messages) return;
     if (panel.dataset.aiReady === "1") return;
     panel.dataset.aiReady = "1";
 
+    const input = form.elements.message;
+    const submitButton = form.querySelector("button[type='submit']");
+
+    function setOpen(isOpen) {
+        panel.classList.toggle("open", isOpen);
+        panel.setAttribute("aria-hidden", isOpen ? "false" : "true");
+        toggles.forEach((toggle) => {
+            toggle.setAttribute("aria-expanded", isOpen ? "true" : "false");
+        });
+        if (isOpen && input) {
+            window.setTimeout(() => input.focus(), 80);
+        }
+    }
+
     toggles.forEach((toggle) => {
         toggle.addEventListener("click", () => {
-            panel.classList.toggle("open");
+            setOpen(!panel.classList.contains("open"));
         });
     });
 
-    form.addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const input = form.elements.message;
-        const text = input.value.trim();
+    async function sendMessage(text) {
         if (!text) return;
         appendAiMessage(messages, "user", text);
         input.value = "";
-        appendAiMessage(messages, "assistant", "正在查询本地推荐数据...");
-        const pending = messages.lastElementChild;
+        if (submitButton) submitButton.disabled = true;
+        const pending = appendAiMessage(messages, "assistant", "正在查询本地推荐数据", { pending: true });
         try {
             const response = await fetch("/api/assistant", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ message: text })
+                body: JSON.stringify(collectAssistantContext(text))
             });
             const payload = await response.json();
-            pending.textContent = payload.answer || "没有生成有效回答。";
+            setAiMessageContent(pending, payload);
         } catch (error) {
-            pending.textContent = "助手接口暂时不可用，请稍后再试。";
+            setAiMessageText(pending, "助手接口暂时不可用，请稍后再试。");
+        } finally {
+            if (submitButton) submitButton.disabled = false;
+            if (input) input.focus();
+        }
+    }
+
+    form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const text = input.value.trim();
+        sendMessage(text);
+    });
+
+    suggestions.forEach((button) => {
+        button.addEventListener("click", () => {
+            setOpen(true);
+            sendMessage(button.dataset.aiSuggestion || button.textContent.trim());
+        });
+    });
+
+    document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && panel.classList.contains("open")) {
+            setOpen(false);
         }
     });
 
     const params = new URLSearchParams(window.location.search);
     if (params.get("assistant") === "open") {
-        panel.classList.add("open");
+        setOpen(true);
         const demoQuestion = params.get("ask");
         if (demoQuestion) {
-            form.elements.message.value = demoQuestion;
-            form.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+            input.value = demoQuestion;
+            sendMessage(demoQuestion);
         }
     }
 }

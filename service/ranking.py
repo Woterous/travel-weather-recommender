@@ -84,6 +84,7 @@ def build_ml_prediction_highlights(ranking: list[dict], limit: int = 3) -> list[
 def build_city_catalog(repository: WeatherRepository, ranking: list[dict], selected_date: str) -> list[dict]:
     ranked_by_slug = {row["city_slug"]: row for row in ranking}
     added_cities = repository.get_added_cities()
+    active_slugs = [str(item.get("slug") or "") for item in added_cities]
     forecast_df = repository.get_forecast_daily()
     available_dates_by_slug = {}
     if not forecast_df.empty:
@@ -94,6 +95,9 @@ def build_city_catalog(repository: WeatherRepository, ranking: list[dict], selec
     catalog = []
     seen_slugs = set()
 
+    def compare_slug_for(slug: str) -> str:
+        return next((active_slug for active_slug in active_slugs if active_slug and active_slug != slug), "")
+
     def add_city(slug: str, name: str, source: str) -> None:
         if not slug or slug in seen_slugs:
             return
@@ -101,7 +105,15 @@ def build_city_catalog(repository: WeatherRepository, ranking: list[dict], selec
         ranked_row = ranked_by_slug.get(slug)
         if ranked_row:
             catalog.append(
-                {**ranked_row, "slug": slug, "name": name, "source_label": source, "has_score": True, "is_custom": True}
+                {
+                    **ranked_row,
+                    "slug": slug,
+                    "name": name,
+                    "source_label": source,
+                    "has_score": True,
+                    "is_custom": True,
+                    "compare_slug": compare_slug_for(slug),
+                }
             )
         else:
             catalog.append(
@@ -112,6 +124,7 @@ def build_city_catalog(repository: WeatherRepository, ranking: list[dict], selec
                     "has_score": False,
                     "is_custom": True,
                     "available_date": available_dates_by_slug.get(slug),
+                    "compare_slug": compare_slug_for(slug),
                 }
             )
 
