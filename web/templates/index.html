@@ -327,7 +327,7 @@
                     <a class="icon-button" href="{{ url_for('city_detail', city_slug=row.city_slug) }}?{{ query_with(preferences, date=selected_date) }}" aria-label="查看详情" title="查看详情">
                         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
                     </a>
-                    <a class="icon-button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b='beijing' if row.city_slug != 'beijing' else 'shanghai') }}" aria-label="加入对比" title="加入对比">
+                    <a class="icon-button" href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date, city_a=row.city_slug, city_b=row.compare_slug) }}" aria-label="加入对比" title="加入对比">
                         <span aria-hidden="true">VS</span>
                     </a>
                     {% if row.is_custom %}

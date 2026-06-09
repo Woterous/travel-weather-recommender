@@ -9,11 +9,10 @@ from urllib.parse import urlencode
 
 from flask import Flask, Response, flash, jsonify, redirect, render_template, request, stream_with_context, url_for
 
-from config.cities import CITIES, CITY_BY_SLUG, DEFAULT_CITY_SLUG
+from config.cities import CityConfig
 from config.preferences import DEFAULT_PREFERENCES, PREFERENCE_OPTIONS, normalize_preferences, preference_label
 from service.ai_assistant import answer_assistant_message
 from service.city_search import city_from_search_payload, search_cities
-from config.cities import CityConfig
 from service.compare import build_compare_context
 from service.database import WeatherRepository
 from service.history_analysis import get_city_history_series, get_history_ranking, month_num_options
@@ -73,6 +72,41 @@ def _preferred_repository_forecast_date(repository: WeatherRepository) -> str:
     return _preferred_forecast_date(repository.get_forecast_dates())
 
 
+def _city_namespace_from_option(option: dict | None):
+    if not option:
+        return SimpleNamespace(slug="", name="暂无城市")
+    return SimpleNamespace(slug=option["slug"], name=option["name"])
+
+
+def _select_city_option(city_options: list[dict], requested_slug: str | None = None, fallback_index: int = 0) -> dict | None:
+    if not city_options:
+        return None
+    if requested_slug:
+        matched = next((city for city in city_options if city["slug"] == requested_slug), None)
+        if matched:
+            return matched
+    return city_options[min(fallback_index, len(city_options) - 1)]
+
+
+def _select_compare_cities(city_options: list[dict], requested_a: str | None, requested_b: str | None) -> tuple[str, str]:
+    city_a_option = _select_city_option(city_options, requested_a, 0)
+    if not city_a_option:
+        return "", ""
+    city_a = city_a_option["slug"]
+    city_b_option = _select_city_option(city_options, requested_b, 1 if len(city_options) > 1 else 0)
+    city_b = city_b_option["slug"] if city_b_option else ""
+    if city_b == city_a:
+        city_b = next((city["slug"] for city in city_options if city["slug"] != city_a), "")
+    return city_a, city_b
+
+
+def _first_other_city_slug(repository: WeatherRepository, city_slug: str) -> str:
+    return next(
+        (city["slug"] for city in repository.get_available_cities() if city["slug"] != city_slug),
+        "",
+    )
+
+
 def _aqi_display(value) -> str:
     try:
         numeric = float(value)
@@ -120,16 +154,7 @@ def _city_for_detail(repository: WeatherRepository, city_slug: str):
             latitude=city_record["latitude"],
             longitude=city_record["longitude"],
         )
-    city_meta = repository.get_city_meta(city_slug)
-    if not city_meta:
-        return None
-    return SimpleNamespace(
-        slug=city_meta["slug"],
-        name=city_meta["name"],
-        pinyin=city_meta["pinyin"],
-        latitude=None,
-        longitude=None,
-    )
+    return None
 
 
 def _city_from_query(city_slug: str, args):
@@ -159,7 +184,7 @@ def register_routes(app: Flask) -> None:
             return _query_string(preferences, extra)
 
         return {
-            "cities": CITIES,
+            "cities": WeatherRepository().get_available_cities(),
             "preference_options": PREFERENCE_OPTIONS,
             "preference_label": preference_label,
             "query_with": query_with,
@@ -206,7 +231,6 @@ def register_routes(app: Flask) -> None:
             available_dates=dates,
             preferences=preferences,
             latest_refresh=repository.get_latest_refresh_info(),
-            default_compare_city="shanghai",
             search_query=search_query,
             search_results=search_results,
             search_error=search_error,
@@ -265,6 +289,7 @@ def register_routes(app: Flask) -> None:
             autoload_city=autoload_city,
             city_in_library=city_record is not None,
             can_add_city_to_library=bool(city.latitude or request.args.get("latitude")),
+            compare_city_slug=_first_other_city_slug(repository, city.slug),
             **context,
         )
 
@@ -274,10 +299,13 @@ def register_routes(app: Flask) -> None:
         preferences = normalize_preferences(request.args)
         dates = repository.get_forecast_dates()
         selected_date = _resolve_selected_date(request.args.get("date"), dates)
-        city_a = request.args.get("city_a") or DEFAULT_CITY_SLUG
-        city_b = request.args.get("city_b") or "shanghai"
-        context = build_compare_context(repository, city_a, city_b, selected_date, preferences) if selected_date else {}
-        city_options = repository.get_available_cities() or [{"slug": city.slug, "name": city.name} for city in CITIES]
+        city_options = repository.get_available_cities()
+        city_a, city_b = _select_compare_cities(city_options, request.args.get("city_a"), request.args.get("city_b"))
+        context = (
+            build_compare_context(repository, city_a, city_b, selected_date, preferences)
+            if selected_date and city_a and city_b
+            else {"row_a": None, "row_b": None, "aqi_available": repository.aqi_available()}
+        )
         return render_template(
             "compare.html",
             city_a=city_a,
@@ -294,10 +322,12 @@ def register_routes(app: Flask) -> None:
     def history_page():
         repository = WeatherRepository()
         preferences = normalize_preferences(request.args)
-        city_slug = request.args.get("city") or DEFAULT_CITY_SLUG
+        city_options = repository.get_available_cities()
+        selected_city = _select_city_option(city_options, request.args.get("city"))
+        city_slug = selected_city["slug"] if selected_city else ""
         metric = request.args.get("metric") or "suitability"
         history_df = repository.get_history_monthly()
-        city_series = get_city_history_series(history_df, city_slug)
+        city_series = get_city_history_series(history_df, city_slug) if city_slug else []
         month_options = month_num_options(history_df)
         selected_month = _resolve_history_month(request.args.get("month"), month_options)
         ranking = get_history_ranking(history_df, selected_month, metric)
@@ -309,7 +339,8 @@ def register_routes(app: Flask) -> None:
         }
         return render_template(
             "history.html",
-            city=CITY_BY_SLUG[city_slug],
+            city=_city_namespace_from_option(selected_city),
+            city_options=city_options,
             selected_month=selected_month,
             month_options=month_options,
             metric=metric,
