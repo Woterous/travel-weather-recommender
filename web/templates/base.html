@@ -41,18 +41,33 @@
     </div>
 
     <section class="ai-assistant" aria-label="全局 AI 助手">
-        <button class="ai-toggle" type="button" data-ai-toggle>AI</button>
-        <div class="ai-panel" data-ai-panel>
+        <button class="ai-toggle" type="button" data-ai-toggle aria-label="打开 AI 助手" aria-expanded="false">
+            <span class="ai-toggle-icon" aria-hidden="true"></span>
+            <span class="ai-toggle-mark">问天气</span>
+        </button>
+        <div class="ai-panel" data-ai-panel role="dialog" aria-label="全局 AI 助手" aria-hidden="true">
             <div class="ai-panel-head">
-                <strong>全局 AI 助手</strong>
-                <button type="button" data-ai-toggle>×</button>
+                <div>
+                    <strong>旅行天气助手</strong>
+                </div>
+                <button type="button" data-ai-toggle aria-label="关闭 AI 助手">×</button>
             </div>
             <div class="ai-messages" data-ai-messages>
-                <div class="ai-message assistant">可以问我：今天推荐哪个城市？北京 AQI 怎么样？</div>
+                <div class="ai-message assistant">
+                    <span class="ai-message-avatar" aria-hidden="true">AI</span>
+                    <div class="ai-message-bubble">
+                        <span class="ai-message-text">我会结合当前日期、页面城市和偏好设置回答。可以问：今天推荐哪个城市？北京 AQI 怎么样？</span>
+                    </div>
+                </div>
+            </div>
+            <div class="ai-suggestions" aria-label="快捷问题">
+                <button type="button" data-ai-suggestion="今天推荐哪个城市？">今日推荐</button>
+                <button type="button" data-ai-suggestion="北京适合去吗？">城市适宜度</button>
+                <button type="button" data-ai-suggestion="北京和上海哪个好？">城市对比</button>
             </div>
             <form class="ai-form" data-ai-form>
-                <input type="text" name="message" placeholder="输入问题">
-                <button type="submit">发送</button>
+                <input type="text" name="message" placeholder="问推荐、AQI、对比或偏好影响" autocomplete="off">
+                <button type="submit" aria-label="发送问题">发送</button>
             </form>
         </div>
     </section>
