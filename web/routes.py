@@ -502,6 +502,5 @@ def register_routes(app: Flask) -> None:
         if not message:
             return jsonify({"answer": "请输入你想了解的问题，例如：今天推荐哪个城市？北京空气质量怎么样？", "mode": "local"})
         repository = WeatherRepository()
-        preferences = normalize_preferences(payload.get("preferences") or {})
-        result = answer_assistant_message(message, repository, preferences)
+        result = answer_assistant_message(message, repository, payload)
         return jsonify(result)
