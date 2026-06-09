@@ -5,8 +5,9 @@
 {% block content %}
 <section class="hero-panel compact preference-hero">
     <div class="hero-copy">
-        <p class="eyebrow">偏好设置页</p>
+        <p class="eyebrow">偏好设置</p>
         <h1>偏好设置</h1>
+        <p>调整偏好后，首页排行、城市详情和对比页会使用同一套权重重新计算。</p>
         <div class="hero-actions">
             <button type="button" class="button button-primary" data-smart-back data-fallback-url="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date) }}">返回上一页</button>
         </div>
@@ -18,6 +19,7 @@
         <input type="hidden" name="date" value="{{ selected_date }}">
         <div class="section-head">
             <h2>偏好滑块</h2>
+            <span>自动应用到当前链接</span>
         </div>
         {% for key, options in preference_options.items() %}
             {% if key != "aqi_sensitivity" or aqi_available %}
@@ -65,7 +67,7 @@
 
     <div class="card preference-impact-card">
         <div class="section-head">
-            <h2>影响说明</h2>
+            <h2>权重影响</h2>
             <span>当前规则摘要</span>
         </div>
         <div class="impact-weight-grid">
@@ -92,7 +94,7 @@
             <li>当前是无 AQI 模式，空气质量偏好不会参与评分。</li>
             {% endif %}
         </ul>
-        <a class="button" href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date) }}">返回首页</a>
+        <a class="button button-primary" href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date) }}">查看更新后的推荐</a>
     </div>
 </section>
 {% endblock %}

@@ -6,9 +6,9 @@
 {% block content %}
 <section class="hero-panel compact">
     <div class="hero-copy">
-        <p class="eyebrow">City Detail</p>
-        <h1>{{ city.name }}</h1>
-        <p>查看指定日期的推荐结论、基础天气、机器学习预测、未来趋势和历史月度表现。</p>
+        <p class="eyebrow">城市详情</p>
+        <h1>{{ city.name }} 出行判断</h1>
+        <p>按当前日期和偏好查看推荐结论、基础天气、机器学习预测、未来趋势和历史月度表现。</p>
         <div class="hero-actions">
             <button type="button" class="button button-primary" data-smart-back data-use-stored-source="1" data-return-url="{{ request.args.get('return_to', '') }}" data-fallback-url="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date, q=request.args.get('name', city.name)) }}#search" {% if request.args.get('autoload') == '1' %}data-prefer-fallback="1"{% endif %}>返回上一页</button>
             {% if selected and not city_in_library and can_add_city_to_library %}
@@ -48,8 +48,8 @@
 <section class="product-section">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">Recommendation Result</p>
-            <h2 class="section-title">这一天，{{ city.name }} 的出行状态。</h2>
+            <p class="section-kicker">推荐结论</p>
+            <h2 class="section-title">{{ city.name }} 的单日出行状态</h2>
         </div>
         <p class="section-lead">{{ selected.reason }}</p>
     </div>
@@ -77,8 +77,8 @@
 <section class="product-section">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">Weather Snapshot</p>
-            <h2 class="section-title">天气要素被压缩成可读的判断。</h2>
+            <p class="section-kicker">天气快照</p>
+            <h2 class="section-title">影响评分的关键天气要素</h2>
         </div>
         <p class="section-lead">保留最高温、最低温、风力、降雨和 AQI 等核心指标。</p>
     </div>
@@ -109,8 +109,8 @@
 <section class="product-section">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">ML Forecast</p>
-            <h2 class="section-title">历史样本预测出的天气倾向。</h2>
+            <p class="section-kicker">历史预测</p>
+            <h2 class="section-title">历史样本预测出的天气倾向</h2>
         </div>
         <p class="section-lead">机器学习预测与 API 预报分开展示，帮助判断天气稳定性。</p>
     </div>
@@ -145,8 +145,8 @@
 <section class="product-section">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">Trend</p>
-            <h2 class="section-title">未来趋势与历史画像放在最后判断。</h2>
+            <p class="section-kicker">趋势验证</p>
+            <h2 class="section-title">未来趋势与历史画像</h2>
         </div>
         <p class="section-lead">先看当天是否适合出发，再看接下来一周和近 12 个月是否稳定。</p>
     </div>

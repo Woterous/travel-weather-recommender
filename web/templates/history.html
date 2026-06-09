@@ -9,9 +9,9 @@
 {% if metric == "temp_stability" %}{% set metric_label = "温度波动" %}{% endif %}
 <section class="hero-panel compact">
     <div class="hero-copy">
-        <p class="eyebrow">历史分析页</p>
-        <h1>{{ city.name }} 的月度历史画像</h1>
-        <p>首版以月度统计为主，不依赖全量日级明细。</p>
+        <p class="eyebrow">历史分析</p>
+        <h1>{{ city.name }} 月度历史画像</h1>
+        <p>以月度统计解释长期适宜度、雨天频率、舒适温度占比和温度波动。</p>
         <div class="hero-actions">
             <button type="button" class="button button-primary" onclick="history.back()">返回上一页</button>
             <a class="button button-ghost" href="{{ url_for('home') }}?{{ query_with(preferences) }}">返回首页</a>
@@ -44,7 +44,7 @@
     </form>
 </section>
 
-<section class="content-grid">
+<section class="product-section content-grid">
     <div class="card chart-card">
         <div class="section-head"><h2>城市历史趋势</h2><span>默认近12个月，可左右拖动</span></div>
         <div id="history-main-chart" class="chart"></div>
@@ -60,7 +60,7 @@
     </div>
 </section>
 
-<section class="card">
+<section class="product-section card">
     <div class="section-head"><h2>{{ selected_month }} 月城市排名</h2><span>按 {{ metric_label }} 排序</span></div>
     <table class="data-table">
         <thead>

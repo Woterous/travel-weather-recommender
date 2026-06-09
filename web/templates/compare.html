@@ -11,9 +11,9 @@
 
 <section class="hero-panel compact">
     <div class="hero-copy">
-        <p class="eyebrow">城市对比页</p>
+        <p class="eyebrow">城市对比</p>
         <h1>双城市对比</h1>
-        <p>对比总分、天气维度和历史月度表现。</p>
+        <p>在同一天、同一偏好下对比总分、天气维度和历史月度表现。</p>
         <div class="hero-actions">
             <button type="button" class="button button-primary" data-smart-back data-fallback-url="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date) }}">返回上一页</button>
         </div>
@@ -39,6 +39,16 @@
 </section>
 
 {% if row_a and row_b %}
+<section class="product-section">
+    <div class="section-intro split">
+        <div>
+            <p class="section-kicker">对比结论</p>
+            <h2 class="section-title">两座城市的单日适宜度差异</h2>
+        </div>
+        <p class="section-lead">分差来自同一套评分权重，下面的分项图表用于解释差异来源。</p>
+    </div>
+</section>
+
 <section class="compare-overview">
     <div class="card score-compare">
         <h3>{{ row_a.city_name }}</h3>
@@ -61,7 +71,7 @@
     </div>
 </section>
 
-<section class="content-grid">
+<section class="product-section content-grid">
     <div class="card chart-card">
         <div class="section-head"><h2>分项对比</h2><span>{{ selected_date }}</span></div>
         <div id="compare-chart" class="chart"></div>
@@ -73,7 +83,7 @@
     </div>
 </section>
 
-<section class="card chart-card">
+<section class="product-section card chart-card">
     <div class="section-head"><h2>历史月度适宜度对比</h2><span>本地历史数据</span></div>
     <div id="history-compare-chart" class="chart"></div>
 </section>

@@ -1,25 +1,25 @@
 {% extends "base.html" %}
 {% from "_date_switcher.html" import floating_date_switcher %}
 
-{% block title %}全国城市旅游出行推荐 | Travel Weather{% endblock %}
+{% block title %}首页推荐 | 旅行天气推荐系统{% endblock %}
 
 {% block content %}
 {% call floating_date_switcher(url_for('home'), selected_date, available_dates, preferences, "首页推荐") %}{% endcall %}
 
 <section class="product-hero">
     <div class="hero-copy">
-        <p class="eyebrow">Travel Intelligence</p>
-        <h1 class="hero-title">把天气变成下一站灵感。</h1>
-        <p class="hero-lead">结合未来天气、AQI、历史稳定性和你的旅行偏好，为全国城市生成更适合出发的推荐顺序。</p>
+        <p class="eyebrow">演示总览</p>
+        <h1 class="hero-title">天气数据驱动的城市推荐</h1>
+        <p class="hero-lead">从本地 SQLite 读取未来天气、AQI、历史稳定性和偏好权重，生成可解释的旅游适宜度排行。</p>
         <div class="hero-actions">
-            <a class="button button-primary" href="#recommendations">查看推荐</a>
+            <a class="button button-primary" href="#recommendations">查看推荐排行</a>
             <a class="button button-ghost" href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date) }}">调整偏好</a>
         </div>
     </div>
 
     <div class="hero-visual" data-parallax-visual>
         <div class="floating-status">
-            <h3>当前状态</h3>
+            <h3>数据刷新状态</h3>
             <ul class="meta-list">
                 <li><span>数据状态</span><strong>{{ latest_refresh.status }}</strong></li>
                 <li><span>最近更新时间</span><strong>{{ latest_refresh.refresh_time|replace("T", " ") }}</strong></li>
@@ -43,8 +43,8 @@
 <section class="product-section">
     <div class="status-strip">
         <div class="status-item"><span>城市库</span><strong>{{ city_catalog|length if city_catalog else 0 }} 个城市</strong></div>
-        <div class="status-item"><span>AQI</span><strong>{{ "已启用" if aqi_available else "未启用" }}</strong></div>
-        <div class="status-item"><span>模型</span><strong>{{ model_summary.name }}</strong></div>
+        <div class="status-item"><span>AQI 状态</span><strong>{{ "参与评分" if aqi_available else "未参与评分" }}</strong></div>
+        <div class="status-item"><span>预测模型</span><strong>{{ model_summary.name }}</strong></div>
         <div class="status-item"><span>训练样本</span><strong>{{ model_summary.sample_count }}</strong></div>
     </div>
 </section>
@@ -52,10 +52,10 @@
 <section class="product-section search-stage" id="search">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">City Search</p>
-            <h2 class="section-title">想去哪里，先让系统看一眼天气。</h2>
+            <p class="section-kicker">城市搜索</p>
+            <h2 class="section-title">搜索城市并加载天气数据</h2>
         </div>
-        <p class="section-lead">搜索任意城市，进入详情页后可自动加载未来天气、历史样本和推荐评分。</p>
+        <p class="section-lead">用于课堂扩展演示。进入详情页后可自动加载未来天气、历史样本和推荐评分。</p>
     </div>
 
     <div class="search-hero">
@@ -176,10 +176,10 @@
 <section class="product-section">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">Personalized Model</p>
-            <h2 class="section-title">偏好和模型状态集中在一屏。</h2>
+            <p class="section-kicker">评分依据</p>
+            <h2 class="section-title">偏好和模型状态集中展示</h2>
         </div>
-        <p class="section-lead">保留筛选能力，把后台式面板整理成更轻的判断依据。</p>
+        <p class="section-lead">推荐结果会随偏好变化，权重和模型状态在这里保持可追溯。</p>
     </div>
 
     <div class="controls-grid home-controls-grid">
@@ -192,6 +192,24 @@
                 <li><span>预测目标</span><strong>温度 / 降雨概率 / 风力</strong></li>
             </ul>
         </div>
+        <div class="card">
+            <h3>当前评分权重</h3>
+            <ul class="weight-list">
+                {% for key, value in weights_preview.items() %}
+                <li>
+                    <span>
+                        {% if key == "temperature" %}温度舒适度{% endif %}
+                        {% if key == "rain" %}降雨风险{% endif %}
+                        {% if key == "wind" %}风力舒适度{% endif %}
+                        {% if key == "weather" %}天气类型{% endif %}
+                        {% if key == "history" %}历史稳定性{% endif %}
+                        {% if key == "aqi" %}AQI{% endif %}
+                    </span>
+                    <strong>{{ "%.2f"|format(value) }}</strong>
+                </li>
+                {% endfor %}
+            </ul>
+        </div>
     </div>
 
 </section>
@@ -201,8 +219,8 @@
 <section class="ml-prediction-panel">
     <div class="section-head">
         <div>
-            <p class="eyebrow">Machine Learning Forecast</p>
-            <h2 class="section-title">历史数据给出的另一种出发判断。</h2>
+            <p class="eyebrow">历史预测</p>
+            <h2 class="section-title">历史数据给出的辅助判断</h2>
         </div>
         <span>{{ selected_date }}</span>
     </div>
@@ -250,10 +268,10 @@
 <section class="product-section" id="recommendations">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">Recommendation</p>
-            <h2 class="section-title">今天更值得出发的城市。</h2>
+            <p class="section-kicker">推荐排行</p>
+            <h2 class="section-title">按当前偏好计算的城市顺序</h2>
         </div>
-        <p class="section-lead">总分由天气、温度、降雨、风力、历史稳定性和 AQI 共同计算。</p>
+        <p class="section-lead">总分由天气、温度、降雨、风力、历史稳定性和 AQI 共同计算，详情页会展示分项依据。</p>
     </div>
 
     <div class="recommendation-grid">
@@ -300,8 +318,8 @@
 <section class="product-section">
     <div class="section-intro split">
         <div>
-            <p class="section-kicker">City Library</p>
-            <h2 class="section-title">城市库像目的地画廊一样浏览。</h2>
+            <p class="section-kicker">城市库</p>
+            <h2 class="section-title">已纳入演示的城市数据</h2>
         </div>
         <p class="section-lead">{{ city_catalog|length }} 个城市。已有当前日期天气数据的城市会显示评分，也可加入双城市对比。</p>
     </div>

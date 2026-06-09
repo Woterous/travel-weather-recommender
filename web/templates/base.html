@@ -13,15 +13,15 @@
             <a class="brand" href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">
                 <span class="brand-mark">TW</span>
                 <span>
-                    <strong>Travel Weather</strong>
-                    <small>全国城市旅游出行推荐</small>
+                    <strong>旅行天气推荐系统</strong>
+                    <small>天气评分与城市推荐演示</small>
                 </span>
             </a>
             <nav class="nav-links">
-                <a href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">首页</a>
-                <a href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">偏好设置</a>
-                <a href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}">城市对比</a>
-                <a href="{{ url_for('history_page') }}?{{ query_with(preferences) }}">历史分析</a>
+                <a href="{{ url_for('home') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}" {% if request.endpoint == 'home' %}class="active" aria-current="page"{% endif %}>首页</a>
+                <a href="{{ url_for('preferences_page') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}" {% if request.endpoint == 'preferences_page' %}class="active" aria-current="page"{% endif %}>偏好设置</a>
+                <a href="{{ url_for('compare_page') }}?{{ query_with(preferences, date=selected_date if selected_date is defined else '') }}" {% if request.endpoint == 'compare_page' %}class="active" aria-current="page"{% endif %}>城市对比</a>
+                <a href="{{ url_for('history_page') }}?{{ query_with(preferences) }}" {% if request.endpoint == 'history_page' %}class="active" aria-current="page"{% endif %}>历史分析</a>
             </nav>
         </header>
 
