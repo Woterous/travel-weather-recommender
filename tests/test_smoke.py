@@ -81,13 +81,18 @@ class AppSmokeTest(unittest.TestCase):
         self.assertIn("北京", response.get_json()["answer"])
 
     def test_local_assistant_question_date_overrides_page_date(self) -> None:
+        class FixedDatesRepository:
+            def get_forecast_dates(self):
+                return ["2026-05-31", "2026-06-01", "2026-06-02"]
+
+        repository = FixedDatesRepository()
         with mock.patch("service.ai_assistant.date") as mocked_date:
             mocked_date.today.return_value = date(2026, 5, 31)
             mocked_date.side_effect = lambda *args, **kwargs: date(*args, **kwargs)
-            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "明天去哪里比较好"), "2026-06-01")
-            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "6月2日北京天气"), "2026-06-02")
-            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "06-02北京天气"), "2026-06-02")
-            self.assertEqual(_forecast_date(database.WeatherRepository(), "2026-05-31", "6.2北京天气"), "2026-06-02")
+            self.assertEqual(_forecast_date(repository, "2026-05-31", "明天去哪里比较好"), "2026-06-01")
+            self.assertEqual(_forecast_date(repository, "2026-05-31", "6月2日北京天气"), "2026-06-02")
+            self.assertEqual(_forecast_date(repository, "2026-05-31", "06-02北京天气"), "2026-06-02")
+            self.assertEqual(_forecast_date(repository, "2026-05-31", "6.2北京天气"), "2026-06-02")
 
     def test_assistant_uses_external_model_when_requested(self) -> None:
         with mock.patch("service.ai_assistant.call_external_ai_provider", return_value="GLM 模型回答") as mocked_external:
