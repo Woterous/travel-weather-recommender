@@ -686,14 +686,26 @@ function initPreferenceSliders() {
         const current = row ? row.querySelector("[data-preference-current]") : null;
         const ticks = row ? row.querySelectorAll("[data-preference-tick]") : [];
         const options = optionList(slider);
-        const index = Math.max(0, Math.min(options.length - 1, Number(slider.value) || 0));
+        const maxIndex = Math.max(0, options.length - 1);
+        const rawValue = Math.max(0, Math.min(maxIndex, Number(slider.value) || 0));
+        const index = Math.round(rawValue);
         const option = options[index];
         if (!option) return;
+        const progress = maxIndex > 0 ? (rawValue / maxIndex) * 100 : 0;
+        slider.style.setProperty("--slider-progress", `${progress}%`);
         if (hidden) hidden.value = option[0];
         if (current) current.textContent = option[1];
         ticks.forEach((tick, tickIndex) => {
             tick.classList.toggle("active", tickIndex === index);
         });
+    }
+
+    function snapSliderValue(slider) {
+        const options = optionList(slider);
+        const maxIndex = Math.max(0, options.length - 1);
+        const rawValue = Math.max(0, Math.min(maxIndex, Number(slider.value) || 0));
+        slider.value = String(Math.round(rawValue));
+        applySliderValue(slider);
     }
 
     function submitPreferences(delay) {
@@ -716,12 +728,25 @@ function initPreferenceSliders() {
     }
 
     sliders.forEach((slider) => {
+        slider.addEventListener("pointerdown", () => {
+            slider.classList.add("is-dragging");
+        });
+        slider.addEventListener("pointerup", () => {
+            slider.classList.remove("is-dragging");
+        });
+        slider.addEventListener("pointercancel", () => {
+            slider.classList.remove("is-dragging");
+        });
+        slider.addEventListener("blur", () => {
+            slider.classList.remove("is-dragging");
+        });
         slider.addEventListener("input", () => {
             applySliderValue(slider);
+            if (slider.classList.contains("is-dragging")) return;
             submitPreferences(700);
         });
         slider.addEventListener("change", () => {
-            applySliderValue(slider);
+            snapSliderValue(slider);
             submitPreferences(220);
         });
         applySliderValue(slider);
