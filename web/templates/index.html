@@ -25,7 +25,7 @@
                 <li><span>最近更新时间</span><strong>{{ latest_refresh.refresh_time|replace("T", " ") }}</strong></li>
                 <li><span>当前日期</span><strong>{{ selected_date or "暂无数据" }}</strong></li>
             </ul>
-            <form method="post" action="{{ url_for('refresh') }}" class="refresh-form">
+            <form method="post" action="{{ url_for('refresh') }}" class="refresh-form" data-auto-refresh-pending="{{ '1' if auto_refresh_pending else '0' }}">
                 <input type="hidden" name="date" value="{{ selected_date }}">
                 {% for key, value in preferences.items() %}
                     <input type="hidden" name="{{ key }}" value="{{ value }}">

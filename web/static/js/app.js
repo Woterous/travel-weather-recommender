@@ -553,6 +553,10 @@ function initRefreshProgress() {
 
     form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        startRefresh();
+    });
+
+    async function startRefresh() {
         openModal();
         try {
             const response = await fetch("/refresh/start", {
@@ -574,13 +578,20 @@ function initRefreshProgress() {
             if (messageNode) messageNode.textContent = "无法启动实时进度刷新，正在使用普通刷新方式。";
             window.setTimeout(() => form.submit(), 800);
         }
-    });
+    }
 
     if (closeNode && closeNode.dataset.refreshCloseReady !== "1") {
         closeNode.dataset.refreshCloseReady = "1";
         closeNode.addEventListener("click", () => {
             modal.classList.remove("open");
         });
+    }
+
+    if (form.dataset.autoRefreshPending === "1" && form.dataset.autoRefreshStarted !== "1") {
+        form.dataset.autoRefreshStarted = "1";
+        window.setTimeout(() => {
+            startRefresh();
+        }, 300);
     }
 
     const params = new URLSearchParams(window.location.search);

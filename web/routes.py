@@ -11,6 +11,7 @@ from flask import Flask, Response, flash, jsonify, redirect, render_template, re
 
 from config.cities import CityConfig
 from config.preferences import DEFAULT_PREFERENCES, PREFERENCE_OPTIONS, normalize_preferences, preference_label
+from config.refresh import AUTO_REFRESH_ON_HOME_OPEN
 from service.ai_assistant import answer_assistant_message
 from service.city_search import city_from_search_payload, search_cities
 from service.compare import build_compare_context
@@ -70,6 +71,16 @@ def _resolve_history_month(requested_month: str | None, month_options: list[int]
 
 def _preferred_repository_forecast_date(repository: WeatherRepository) -> str:
     return _preferred_forecast_date(repository.get_forecast_dates())
+
+
+def _auto_refresh_enabled() -> bool:
+    return str(AUTO_REFRESH_ON_HOME_OPEN).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _refresh_is_current_today(latest_refresh: dict) -> bool:
+    refresh_time = str(latest_refresh.get("refresh_time") or "")
+    status = str(latest_refresh.get("status") or "")
+    return refresh_time.startswith(date.today().isoformat()) and status in {"success", "partial"}
 
 
 def _city_namespace_from_option(option: dict | None):
@@ -213,6 +224,9 @@ def register_routes(app: Flask) -> None:
                 preview_weather = preview_city_forecast(city_from_search_payload(_candidate_payload_from_args(request.args)))
             except Exception as exc:
                 preview_error = f"当前天气预览失败：{exc}"
+        latest_refresh = repository.get_latest_refresh_info()
+        auto_refresh_enabled = _auto_refresh_enabled()
+        auto_refresh_pending = auto_refresh_enabled and not _refresh_is_current_today(latest_refresh)
         context = (
             build_homepage_context(repository, selected_date, preferences)
             if selected_date
@@ -230,7 +244,9 @@ def register_routes(app: Flask) -> None:
             selected_date=selected_date,
             available_dates=dates,
             preferences=preferences,
-            latest_refresh=repository.get_latest_refresh_info(),
+            latest_refresh=latest_refresh,
+            auto_refresh_enabled=auto_refresh_enabled,
+            auto_refresh_pending=auto_refresh_pending,
             search_query=search_query,
             search_results=search_results,
             search_error=search_error,

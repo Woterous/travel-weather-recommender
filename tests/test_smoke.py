@@ -38,6 +38,61 @@ class AppSmokeTest(unittest.TestCase):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200, path)
 
+    def test_home_auto_refresh_defaults_off(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                with mock.patch("web.routes.AUTO_REFRESH_ON_HOME_OPEN", 0):
+                    response = self.client.get("/")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('data-auto-refresh-pending="0"', response.data.decode("utf-8"))
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_home_auto_refresh_marks_stale_data_when_enabled(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                database.log_refresh("2026-01-01T08:00:00", "success", "old refresh")
+                with mock.patch("web.routes.AUTO_REFRESH_ON_HOME_OPEN", 1):
+                    response = self.client.get("/")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('data-auto-refresh-pending="1"', response.data.decode("utf-8"))
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_home_auto_refresh_skips_when_today_is_current(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                database.log_refresh(f"{date.today().isoformat()}T08:00:00", "success", "today refresh")
+                with mock.patch("web.routes.AUTO_REFRESH_ON_HOME_OPEN", True):
+                    response = self.client.get("/")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('data-auto-refresh-pending="0"', response.data.decode("utf-8"))
+            finally:
+                database.DB_PATH = original_db_path
+
+    def test_home_auto_refresh_retries_today_failed_refresh(self) -> None:
+        original_db_path = database.DB_PATH
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database.DB_PATH = Path(temp_dir) / "test.sqlite3"
+            try:
+                database.log_refresh(f"{date.today().isoformat()}T08:00:00", "error", "failed refresh")
+                with mock.patch("web.routes.AUTO_REFRESH_ON_HOME_OPEN", True):
+                    response = self.client.get("/")
+
+                self.assertEqual(response.status_code, 200)
+                self.assertIn('data-auto-refresh-pending="1"', response.data.decode("utf-8"))
+            finally:
+                database.DB_PATH = original_db_path
+
     def test_assistant_api_returns_local_answer(self) -> None:
         response = self.client.post("/api/assistant", json={"message": "今天推荐哪个城市"})
         self.assertEqual(response.status_code, 200)
